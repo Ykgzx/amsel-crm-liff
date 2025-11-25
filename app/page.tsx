@@ -290,7 +290,7 @@ export default function Home() {
                     <div className="text-center mb-6">
                       <p className="text-lg text-gray-700">คะแนนสะสม</p>
                       <p className="text-3xl font-bold text-orange-600">
-                        {currentPoints.toLocaleString()} <span className="text-lg">บาท</span>
+                        {currentPoints.toLocaleString()} <span className="text-lg">แต้ม</span>
                       </p>
                     </div>
 
