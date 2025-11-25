@@ -24,3 +24,28 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* styles/globals.css */
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ตั้งค่าให้ Kanit เป็นฟอนต์หลักทั้งแอป */
+font-sans {
+  font-family: "Kanit", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+/* หรือถ้าอยากใช้แบบเข้ม ๆ หน่อย (แนะนำ) */
+html {
+  font-family: "Kanit", ui-sans-serif, system-ui, sans-serif;
+}
