@@ -11,16 +11,14 @@ interface LiffProfile {
   pictureUrl?: string;
 }
 
-// ข้อมูลที่ได้จาก Backend หลังจาก Register สำเร็จ
 interface UserFullProfile {
   points: number;
-  title?: string;        // นาย, นาง, นางสาว ฯลฯ
+  title?: string;
   firstName?: string;
   lastName?: string;
   email?: string | null;
   phoneNumber?: string | null;
   birthDate?: string | null;
-  pictureUrl?: string;   // ถ้าอนุญาตให้อัปโหลดรูป
 }
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.amsel-crm.com';
@@ -32,12 +30,9 @@ export default function Home() {
   const [isLiffReady, setIsLiffReady] = useState(false);
   const [liffError, setLiffError] = useState<string | null>(null);
   const [liffProfile, setLiffProfile] = useState<LiffProfile | null>(null);
-
-  // ข้อมูลผู้ใช้จริงจาก Backend
   const [userProfile, setUserProfile] = useState<UserFullProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // สินค้าแนะนำ
   const products = [
     { id: 1, name: 'แอมเซลกลูต้า พลัส เรด ออเร้นจ์ เอ็กซ์แทร็คซ์', img: '/gluta.png', alt: 'กลูต้า' },
     { id: 2, name: 'แอมเซลซิงค์พลัส วิตามิน พรีมิกซ์', img: '/zinc.png', alt: 'ซิงค์พลัส' },
@@ -49,7 +44,6 @@ export default function Home() {
 
   const totalPages = Math.ceil(products.length / 2);
 
-  // Tier
   const baseTiers = [
     { name: 'Silver',   minPoints: 0,     maxPoints: 2000,  color: 'bg-gray-300',   textColor: 'text-gray-800',   nextTier: 'Gold' },
     { name: 'Gold',     minPoints: 2000,  maxPoints: 5000,  color: 'bg-yellow-500', textColor: 'text-white',      nextTier: 'Platinum' },
@@ -69,7 +63,13 @@ export default function Home() {
       ? 100
       : Math.min(100, ((currentPoints - currentTier.minPoints) / (currentTier.maxPoints - currentTier.minPoints)) * 100);
 
-  // ดึงข้อมูลผู้ใช้เต็มรูปแบบจาก Backend
+  const formatBirthDate = (isoString: string | null | undefined) => {
+    if (!isoString) return '-';
+    const date = new Date(isoString);
+    const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long', year: 'numeric' };
+    return date.toLocaleDateString('th-TH', options);
+  };
+
   const fetchUserFullProfile = async (lineUserId: string) => {
     try {
       const accessToken = liff.getAccessToken();
@@ -83,7 +83,7 @@ export default function Home() {
         },
       });
 
-      if (!response.ok) throw new Error('Failed to fetch user profile');
+      if (!response.ok) throw new Error('Failed to fetch profile');
 
       const data: UserFullProfile = await response.json();
 
@@ -95,17 +95,17 @@ export default function Home() {
         email: data.email,
         phoneNumber: data.phoneNumber,
         birthDate: data.birthDate,
-        pictureUrl: data.pictureUrl || liffProfile?.pictureUrl,
       });
 
     } catch (err) {
       console.warn('ใช้ข้อมูลสำรอง (Backend ไม่ตอบสนอง)', err);
-      // Fallback: ใช้ข้อมูลจาก LINE + คะแนน mock
       setUserProfile({
         points: 3000,
         firstName: liffProfile?.displayName?.split(' ')[0] || 'สมาชิก',
         lastName: liffProfile?.displayName?.split(' ').slice(1).join(' ') || '',
-        pictureUrl: liffProfile?.pictureUrl,
+        email: 'example@email.com',
+        phoneNumber: '081-234-5678',
+        birthDate: '1990-01-01T00:00:00.000Z',
       });
     } finally {
       setLoading(false);
@@ -128,7 +128,6 @@ export default function Home() {
         setIsLiffReady(true);
 
       } catch (error: any) {
-        console.error('LIFF Error:', error);
         setLiffError('กรุณาเปิดผ่านแอป LINE เท่านั้น');
         setIsLiffReady(true);
       }
@@ -137,7 +136,6 @@ export default function Home() {
     initLiff();
   }, []);
 
-  // Auto scroll ไป Tier ปัจจุบัน
   useEffect(() => {
     if (isLiffReady && memberCardRef.current && !loading && currentTierIndex >= 0) {
       setTimeout(() => {
@@ -161,12 +159,9 @@ export default function Home() {
     }
   };
 
-  // ชื่อเต็มสำหรับแสดง
   const fullName = userProfile?.title
     ? `${userProfile.title} ${userProfile.firstName} ${userProfile.lastName}`
-    : `${userProfile?.firstName || ''} ${userProfile?.lastName || ''}`.trim()
-      || liffProfile?.displayName
-      || 'สมาชิก';
+    : `${userProfile?.firstName || ''} ${userProfile?.lastName || ''}`.trim() || liffProfile?.displayName || 'สมาชิก';
 
   if (!isLiffReady || loading) {
     return (
@@ -199,14 +194,12 @@ export default function Home() {
       <div className="bg-white min-h-screen pt-26 pb-10">
         <div className="max-w-md mx-auto p-6">
 
-          {/* Header */}
           <div className="mb-6">
             <div className="bg-orange-500 rounded-full px-5 py-2 w-fit">
               <h2 className="font-bold text-lg text-white">Member Card</h2>
             </div>
           </div>
 
-          {/* Tier Cards */}
           <div className="relative overflow-hidden mb-8">
             <div
               ref={memberCardRef}
@@ -232,36 +225,34 @@ export default function Home() {
                   <div
                     key={tier.name}
                     className={`flex-shrink-0 w-[calc(100%-2rem)] snap-start rounded-2xl p-6 transition-all shadow-lg ${
-                      isCurrent ? 'border-4 border-orange-500 shadow-2xl scale-105' : 'border border-gray-200 opacity-90'
+                      isCurrent ? 'border-4 border-orange-500 shadow-2xl scale-105' : 'border border-gray-200'
                     }`}
                     style={{ scrollSnapAlign: 'start' }}
                   >
-                    {/* รูปโปรไฟล์ */}
-                    {(userProfile?.pictureUrl || liffProfile?.pictureUrl) && (
-                      <div className="flex justify-center -mt-14 mb-4">
-                        <div className="relative">
-                          <img
-                            src={userProfile?.pictureUrl || liffProfile?.pictureUrl}
-                            alt="Profile"
-                            className="w-28 h-28 rounded-full border-4 border-white shadow-xl object-cover"
-                          />
-                          <div className="absolute bottom-0 right-0 w-8 h-8 bg-orange-500 rounded-full border-4 border-white"></div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Tier Badge */}
-                    <div className={`w-full h-14 rounded-xl flex items-center justify-center mb-5 ${tier.color} ${tier.textColor}`}>
+                    <div className={`w-full h-14 rounded-xl flex items-center justify-center mb-6 ${tier.color} ${tier.textColor}`}>
                       <span className="font-bold text-xl">{tier.name} Tier</span>
                     </div>
 
-                    {/* ชื่อจริงจากฟอร์ม */}
-                    <div className="text-center mb-5">
-                      <p className="text-gray-700 text-sm">ยินดีต้อนรับ</p>
-                      <p className="text-2xl font-bold text-orange-600 mt-1">{fullName}</p>
+                    <div className="text-center mb-6">
+                      <p className="text-gray-600 text-sm">ชื่อ-นามสกุล</p>
+                      <p className="text-xl font-bold text-orange-600">{fullName}</p>
                     </div>
 
-                    {/* คะแนน */}
+                    <div className="space-y-4 mb-6 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">อีเมล</span>
+                        <span className="font-medium text-gray-800">{userProfile?.email || '-'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">เบอร์โทร</span>
+                        <span className="font-medium text-gray-800">{userProfile?.phoneNumber || '-'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">วันเกิด</span>
+                        <span className="font-medium text-gray-800">{formatBirthDate(userProfile?.birthDate)}</span>
+                      </div>
+                    </div>
+
                     <div className="text-center mb-6">
                       <p className="text-lg text-gray-700">คะแนนสะสม</p>
                       <p className="text-3xl font-bold text-orange-600">
@@ -269,7 +260,6 @@ export default function Home() {
                       </p>
                     </div>
 
-                    {/* Progress Bar */}
                     <div className="w-full bg-gray-200 rounded-full h-5 mb-5 overflow-hidden">
                       <div
                         className={`h-full rounded-full transition-all duration-1000 ${tier.color}`}
@@ -277,7 +267,6 @@ export default function Home() {
                       />
                     </div>
 
-                    {/* ข้อความ */}
                     <p className={`text-center text-sm font-medium ${isCurrent ? 'text-orange-600' : 'text-gray-600'}`}>
                       {message}
                     </p>
@@ -287,7 +276,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Quick Actions */}
           <div className="grid grid-cols-2 gap-6 mb-10">
             {[
               { icon: 'fa-ticket-alt', label: 'คูปองของฉัน' },
@@ -304,7 +292,6 @@ export default function Home() {
             ))}
           </div>
 
-          {/* Recommended Products */}
           <h3 className="font-bold text-lg mb-4 text-gray-800">สินค้าแนะนำสำหรับคุณ</h3>
           <div className="relative">
             <button onClick={goToPrevPage} disabled={currentPage === 0}
