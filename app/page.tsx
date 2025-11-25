@@ -69,7 +69,7 @@ export default function Home() {
           ...(accessToken && { Authorization: `Bearer ${accessToken}` }),
         },
       });
-
+      console.log(response.json)
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`HTTP ${response.status}: ${errorText}`);
