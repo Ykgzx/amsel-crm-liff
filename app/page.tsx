@@ -3,6 +3,7 @@
 
 import { useRef, useState, useEffect } from 'react';
 import liff from '@line/liff';
+import Link from 'next/link';
 import Navbar from './components/Navbar';
 
 interface LiffProfile {
@@ -313,17 +314,51 @@ export default function Home() {
           {/* Quick Actions & Products เหมือนเดิม */}
           <div className="grid grid-cols-2 gap-6 mb-10">
             {[
-              { icon: 'fa-ticket-alt', label: 'คูปองของฉัน' },
-              { icon: 'fa-clipboard-list', label: 'ประวัติการสั่งซื้อ' },
-              { icon: 'fa-map-marker-alt', label: 'ที่อยู่' },
-              { icon: 'fa-comment-dots', label: 'รีวิว' },
-            ].map((item, i) => (
-              <div key={i} className="flex flex-col items-center">
-                <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center border-2 border-orange-200 mb-2">
-                  <i className={`fas ${item.icon} text-2xl text-orange-600`}></i>
+              { 
+                icon: 'fa-ticket-alt', 
+                label: 'คูปองของฉัน', 
+                href: '/coupons' 
+              },
+              { 
+                icon: 'fa-clipboard-list', 
+                label: 'ประวัติการสั่งซื้อ', 
+                href: '/orders' 
+              },
+              { 
+                icon: 'fa-map-marker-alt', 
+                label: 'ที่อยู่', 
+                href: '/addresses' 
+              },
+              { 
+                icon: 'fa-comment-dots', 
+                label: 'รีวิว', 
+                href: '/reviews' 
+              },
+              { 
+                icon: 'fa-receipt',
+                label: 'อัปโหลดใบเสร็จ', 
+                href: '/receiptupload' 
+              },
+              { 
+                icon: 'fa-question-circle',
+                label: 'ช่วยเหลือ', 
+                href: '/help' 
+              },
+            ].map((item) => (
+              <Link 
+                key={item.href} 
+                href={item.href}
+                className="flex flex-col items-center group transition-all duration-200"
+              >
+                <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center border-2 border-orange-200 mb-2 
+                                group-hover:bg-orange-200 group-hover:border-orange-400 group-hover:scale-110 
+                                transition-all duration-300 shadow-md">
+                  <i className={`fas ${item.icon} text-2xl text-orange-600 group-hover:text-orange-700`}></i>
                 </div>
-                <span className="text-xs text-center text-gray-700">{item.label}</span>
-              </div>
+                <span className="text-xs text-center text-gray-700 group-hover:text-orange-600 font-medium transition-colors">
+                  {item.label}
+                </span>
+              </Link>
             ))}
           </div>
 
