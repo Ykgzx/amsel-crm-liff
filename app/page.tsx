@@ -13,7 +13,6 @@ interface LiffProfile {
 
 export default function Home() {
   const carouselRef = useRef<HTMLDivElement>(null);
-  const memberCardRef = useRef<HTMLDivElement>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [isLiffReady, setIsLiffReady] = useState(false);
   const [liffError, setLiffError] = useState<string | null>(null);
@@ -34,24 +33,24 @@ export default function Home() {
   const totalPages = Math.ceil(products.length / 2);
 
   const tiers = [
-    { name: 'Silver', minPoints: 0, maxPoints: 2000, color: 'bg-gray-300', textColor: 'text-gray-800', nextTier: 'Gold', nextAmount: 0 },
-    { name: 'Gold', minPoints: 2000, maxPoints: 5000, color: 'bg-yellow-500', textColor: 'text-white', nextTier: 'Platinum', nextAmount: 5000 - currentPoints },
-    { name: 'Platinum', minPoints: 5000, maxPoints: Infinity, color: 'bg-blue-600', textColor: 'text-white', nextTier: '', nextAmount: 0 },
+    { name: 'Silver', minPoints: 0, maxPoints: 2000, color: 'bg-gray-300', textColor: 'text-gray-800' },
+    { name: 'Gold', minPoints: 2000, maxPoints: 5000, color: 'bg-yellow-500', textColor: 'text-white' },
+    { name: 'Platinum', minPoints: 5000, maxPoints: Infinity, color: 'bg-blue-600', textColor: 'text-white' },
   ];
 
   const currentTierIndex = tiers.findIndex(tier => currentPoints >= tier.minPoints && currentPoints < tier.maxPoints);
-  const currentTier = tiers[currentTierIndex] || tiers[tiers.length - 1];
+  const currentTier = tiers[currentTierIndex];
 
   const progressPercent = currentTier.maxPoints === Infinity
     ? 100
     : Math.min(100, ((currentPoints - currentTier.minPoints) / (currentTier.maxPoints - currentTier.minPoints)) * 100);
 
-  // === LIFF Initialization + แก้ปัญหาเลื่อนลงกลางหน้า ===
+  // === LIFF + บังคับให้เริ่มจากบนสุดเสมอ ===
   useEffect(() => {
     const initLiff = async () => {
       try {
         await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID! });
-
+        console.log(liff.getAccessToken())
         if (!liff.isLoggedIn()) {
           liff.login();
           return;
@@ -60,36 +59,34 @@ export default function Home() {
         const userProfile = await liff.getProfile();
         setProfile(userProfile);
 
-        // ใช้ liff.ready เพื่อให้แน่ใจว่า LIFF + DOM พร้อมจริง ๆ
+        // รอ LIFF พร้อม → บังคับเลื่อนขึ้นบนสุดทันที
         liff.ready.then(() => {
           setIsLiffReady(true);
 
-          // 1. เลื่อนขึ้นด้านบนสุดทันที (แก้ปัญหาเปิดจาก LINE)
+          // สำคัญมาก: บังคับให้อยู่ด้านบนสุด ไม่เลื่อนไปไหนเด็ดขาด
           window.scrollTo(0, 0);
+          document.body.scrollTop = 0;
+          document.documentElement.scrollTop = 0;
 
-          // 2. รอ 800ms ให้ผู้ใช้เห็นโลโก้ก่อน แล้วค่อยเลื่อนไป Tier ปัจจุบัน (สวยมาก)
-          setTimeout(() => {
-            const activeCard = memberCardRef.current?.children[currentTierIndex] as HTMLElement;
-            if (activeCard) {
-              activeCard.scrollIntoView({
-                behavior: 'smooth',
-                inline: 'start',
-              });
-            }
-          }, 800);
+          // ถ้ามีการเลื่อนโดยไม่ตั้งใจ ให้ดักไว้
+          const preventAutoScroll = () => {
+            window.scrollTo(0, 0);
+          };
+          window.addEventListener('scroll', preventAutoScroll);
+          setTimeout(() => window.removeEventListener('scroll', preventAutoScroll), 100);
         });
 
       } catch (error) {
-        console.error('LIFF init error:', error);
+        console.error('LIFF Error:', error);
         setLiffError('กรุณาเปิดผ่านแอป LINE เท่านั้น');
         setIsLiffReady(true);
       }
     };
 
     initLiff();
-  }, [currentTierIndex]);
+  }, []);
 
-  // === ฟังก์ชันเลื่อนสินค้า ===
+  // === เลื่อนสินค้า ===
   const goToNextPage = () => {
     if (currentPage < totalPages - 1) {
       setCurrentPage(currentPage + 1);
@@ -104,7 +101,6 @@ export default function Home() {
     }
   };
 
-  // === Loading & Error ===
   if (!isLiffReady) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -115,9 +111,9 @@ export default function Home() {
 
   if (liffError) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center p-6">
-        <div className="text-center">
-          <div className="text-red-500 mb-4 text-lg">{liffError}</div>
+      <div className="min-h-screen bg-white flex items-center justify-center p-6 text-center">
+        <div>
+          <p className="text-red-500 mb-4">{liffError}</p>
           <button
             onClick={() => window.history.back()}
             className="px-6 py-3 bg-orange-500 text-white rounded-xl font-medium hover:bg-orange-600"
@@ -133,58 +129,52 @@ export default function Home() {
     <>
       <Navbar />
 
-      <div className="bg-white min-h-screen pt-26 pb-10">
+      <div className="bg-white min-h-screen pt-26 pb-16">
         <div className="max-w-md mx-auto px-6">
 
-          {/* Member Card Header */}
-          <div className="mb-6 text-center">
+          {/* Header */}
+          <div className="text-center mb-8">
             <div className="bg-orange-500 rounded-full px-6 py-2 w-fit mx-auto">
               <h2 className="font-bold text-xl text-white">Member Card</h2>
             </div>
           </div>
 
-          {/* Tier Carousel */}
-          <div className="relative overflow-hidden mb-8">
-            <div
-              ref={memberCardRef}
-              className="flex space-x-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory"
-              style={{ scrollSnapType: 'x mandatory' }}
-            >
-              {tiers.map((tier, index) => {
-                const isCurrent = index === currentTierIndex;
-                const displayPoints = isCurrent ? currentPoints : index < currentTierIndex ? tier.maxPoints - 1 : tier.minPoints;
-                const progressWidth = isCurrent ? progressPercent : index < currentTierIndex ? 100 : 0;
+          {/* Tier Cards - แสดงแบบธรรมดา ไม่ auto scroll */}
+          <div className="space-y-6 mb-10">
+            {tiers.map((tier, index) => {
+              const isCurrent = index === currentTierIndex;
+              const displayPoints = isCurrent ? currentPoints : index < currentTierIndex ? tier.maxPoints - 1 : tier.minPoints;
+              const progressWidth = isCurrent ? progressPercent : index < currentTierIndex ? 100 : 0;
 
-                const message = index < currentTierIndex
-                  ? 'คุณบรรลุ Tier นี้แล้ว'
-                  : index === currentTierIndex
-                  ? `ซื้ออีก ${tier.nextAmount.toLocaleString()} บาท เพื่อเลื่อนเป็น ${tier.nextTier} Tier`
-                  : `ขาดอีก ${tier.nextAmount.toLocaleString()} บาท เพื่อเลื่อนเป็น ${tier.name} Tier`;
+              const message = index < currentTierIndex
+                ? 'คุณบรรลุ Tier นี้แล้ว'
+                : isCurrent
+                ? `ซื้ออีก ${(5000 - currentPoints).toLocaleString()} บาท เพื่อเลื่อนเป็น Platinum Tier`
+                : `ขาดอีก ${(tier.minPoints - currentPoints).toLocaleString()} บาท เพื่อถึง ${tier.name} Tier`;
 
-                return (
-                  <div
-                    key={tier.name}
-                    className={`flex-shrink-0 w-[calc(100%-2rem)] snap-start rounded-2xl border p-5 transition-all ${
-                      isCurrent ? 'border-orange-300 shadow-lg' : 'border-transparent'
-                    }`}
-                  >
-                    <div className={`w-full h-14 rounded-xl flex items-center justify-center mb-4 ${tier.color} ${tier.textColor}`}>
-                      <span className="font-bold text-xl">{tier.name} Tier</span>
-                    </div>
-                    <p className="text-gray-800 mb-2">
-                      ยินดีต้อนรับ, <span className="font-bold">{profile?.displayName || 'สมาชิก'}</span>
-                    </p>
-                    <p className="text-gray-700 mb-4">
-                      คะแนนปัจจุบัน: <span className="font-bold text-orange-600 text-xl">{displayPoints.toLocaleString()}</span>
-                    </p>
-                    <div className="w-full bg-gray-200 rounded-full h-3 mb-4">
-                      <div className={`h-3 rounded-full transition-all ${tier.color}`} style={{ width: `${progressWidth}%` }}></div>
-                    </div>
-                    <p className="text-sm text-gray-600">{message}</p>
+              return (
+                <div
+                  key={tier.name}
+                  className={`rounded-2xl p-5 border-2 transition-all ${
+                    isCurrent ? 'border-orange-400 shadow-xl' : 'border-gray-200'
+                  }`}
+                >
+                  <div className={`w-full h-14 rounded-xl flex items-center justify-center mb-4 ${tier.color} ${tier.textColor}`}>
+                    <span className="font-bold text-xl">{tier.name} Tier</span>
                   </div>
-                );
-              })}
-            </div>
+                  <p className="text-gray-800 mb-2">
+                    ยินดีต้อนรับ, <span className="font-bold">{profile?.displayName || 'สมาชิก'}</span>
+                  </p>
+                  <p className="text-gray-700 mb-4">
+                    คะแนนปัจจุบัน: <span className="font-bold text-orange-600 text-xl">{displayPoints.toLocaleString()}</span>
+                  </p>
+                  <div className="w-full bg-gray-200 rounded-full h-3 mb-4">
+                    <div className={`h-3 rounded-full transition-all ${tier.color}`} style={{ width: `${progressWidth}%` }}></div>
+                  </div>
+                  <p className="text-sm text-gray-600">{message}</p>
+                </div>
+              );
+            })}
           </div>
 
           {/* Quick Actions */}
@@ -211,9 +201,7 @@ export default function Home() {
             <button
               onClick={goToPrevPage}
               disabled={currentPage === 0}
-              className={`absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-3 shadow-lg border-2 border-orange-200 transition-all ${
-                currentPage === 0 ? 'opacity-50' : 'hover:border-orange-400'
-              }`}
+              className={`absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-3 shadow-lg border-2 border-orange-200 ${currentPage === 0 ? 'opacity-50' : 'hover:border-orange-400'}`}
             >
               <i className="fas fa-chevron-left text-orange-500 text-xl"></i>
             </button>
@@ -244,9 +232,7 @@ export default function Home() {
             <button
               onClick={goToNextPage}
               disabled={currentPage >= totalPages - 1}
-              className={`absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-3 shadow-lg border-2 border-orange-200 transition-all ${
-                currentPage >= totalPages - 1 ? 'opacity-50' : 'hover:border-orange-400'
-              }`}
+              className={`absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-3 shadow-lg border-2 border-orange-200 ${currentPage >= totalPages - 1 ? 'opacity-50' : 'hover:border-orange-400'}`}
             >
               <i className="fas fa-chevron-right text-orange-500 text-xl"></i>
             </button>
