@@ -33,6 +33,20 @@ export default function Home() {
   const [userProfile, setUserProfile] = useState<UserFullProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // เก็บสถานะการเปิด/ปิดข้อมูลส่วนตัวของแต่ละ Tier
+  const [showDetails, setShowDetails] = useState<Record<string, boolean>>({
+    Silver: false,
+    Gold: false,
+    Platinum: false,
+  });
+
+  const toggleDetails = (tierName: string) => {
+    setShowDetails(prev => ({
+      ...prev,
+      [tierName]: !prev[tierName as keyof typeof prev]
+    }));
+  };
+
   const products = [
     { id: 1, name: 'แอมเซลกลูต้า พลัส เรด ออเร้นจ์ เอ็กซ์แทร็คซ์', img: '/gluta.png', alt: 'กลูต้า' },
     { id: 2, name: 'แอมเซลซิงค์พลัส วิตามิน พรีมิกซ์', img: '/zinc.png', alt: 'ซิงค์พลัส' },
@@ -221,6 +235,8 @@ export default function Home() {
                 else if (isCurrent) message = 'ยินดีด้วย! คุณอยู่ระดับสูงสุดแล้ว';
                 else message = `ขาดอีก ${pointsToNext.toLocaleString()} บาท เพื่อไป ${tier.name} Tier`;
 
+                const isExpanded = showDetails[tier.name];
+
                 return (
                   <div
                     key={tier.name}
@@ -238,21 +254,38 @@ export default function Home() {
                       <p className="text-xl font-bold text-orange-600">{fullName}</p>
                     </div>
 
-                    <div className="space-y-4 mb-6 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">อีเมล</span>
-                        <span className="font-medium text-gray-800">{userProfile?.email || '-'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">เบอร์โทร</span>
-                        <span className="font-medium text-gray-800">{userProfile?.phoneNumber || '-'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">วันเกิด</span>
-                        <span className="font-medium text-gray-800">{formatBirthDate(userProfile?.birthDate)}</span>
+                    {/* ปุ่มดูข้อมูลส่วนตัว */}
+                    <div className="mb-4">
+                      <button
+                        onClick={() => toggleDetails(tier.name)}
+                        className="w-full flex items-center justify-center gap-2 py-3 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+                      >
+                        <span className="text-sm font-medium text-gray-700">
+                          {isExpanded ? 'ซ่อน' : 'ดูข้อมูลส่วนตัว'}
+                        </span>
+                        <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'} text-orange-500`}></i>
+                      </button>
+                    </div>
+
+                    {/* ข้อมูลส่วนตัว (แสดง/ซ่อน) */}
+                    <div className={`overflow-hidden transition-all duration-500 ${isExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
+                      <div className="space-y-4 py-4 text-sm border-t border-gray-200 mt-2">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">อีเมล</span>
+                          <span className="font-medium text-gray-800">{userProfile?.email || '-'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">เบอร์โทร</span>
+                          <span className="font-medium text-gray-800">{userProfile?.phoneNumber || '-'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">วันเกิด</span>
+                          <span className="font-medium text-gray-800">{formatBirthDate(userProfile?.birthDate)}</span>
+                        </div>
                       </div>
                     </div>
 
+                    {/* คะแนนสะสม */}
                     <div className="text-center mb-6">
                       <p className="text-lg text-gray-700">คะแนนสะสม</p>
                       <p className="text-3xl font-bold text-orange-600">
@@ -260,6 +293,7 @@ export default function Home() {
                       </p>
                     </div>
 
+                    {/* Progress Bar */}
                     <div className="w-full bg-gray-200 rounded-full h-5 mb-5 overflow-hidden">
                       <div
                         className={`h-full rounded-full transition-all duration-1000 ${tier.color}`}
@@ -276,6 +310,7 @@ export default function Home() {
             </div>
           </div>
 
+          {/* Quick Actions & Products เหมือนเดิม */}
           <div className="grid grid-cols-2 gap-6 mb-10">
             {[
               { icon: 'fa-ticket-alt', label: 'คูปองของฉัน' },
