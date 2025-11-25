@@ -344,6 +344,11 @@ export default function Home() {
                 label: 'ช่วยเหลือ', 
                 href: '/help' 
               },
+              { 
+                icon: 'fa-exchange',
+                label: 'แลกของรางวัล', 
+                href: '/rewardstore' 
+              },
             ].map((item) => (
               <Link 
                 key={item.href} 
