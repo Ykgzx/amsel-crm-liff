@@ -11,11 +11,18 @@ interface LiffProfile {
   pictureUrl?: string;
 }
 
-interface UserProfileResponse {
+// ข้อมูลที่ได้จาก Backend หลังจาก Register สำเร็จ
+interface UserFullProfile {
   points: number;
+  title?: string;        // นาย, นาง, นางสาว ฯลฯ
+  firstName?: string;
+  lastName?: string;
+  email?: string | null;
+  phoneNumber?: string | null;
+  birthDate?: string | null;
+  pictureUrl?: string;   // ถ้าอนุญาตให้อัปโหลดรูป
 }
 
-// เปลี่ยนตรงนี้ได้เลย ใส่ URL Backend จริงของคุณ
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.amsel-crm.com';
 
 export default function Home() {
@@ -24,10 +31,13 @@ export default function Home() {
   const [currentPage, setCurrentPage] = useState(0);
   const [isLiffReady, setIsLiffReady] = useState(false);
   const [liffError, setLiffError] = useState<string | null>(null);
-  const [profile, setProfile] = useState<LiffProfile | null>(null);
-  const [currentPoints, setCurrentPoints] = useState<number>(0);
-  const [loadingPoints, setLoadingPoints] = useState(true);
+  const [liffProfile, setLiffProfile] = useState<LiffProfile | null>(null);
 
+  // ข้อมูลผู้ใช้จริงจาก Backend
+  const [userProfile, setUserProfile] = useState<UserFullProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // สินค้าแนะนำ
   const products = [
     { id: 1, name: 'แอมเซลกลูต้า พลัส เรด ออเร้นจ์ เอ็กซ์แทร็คซ์', img: '/gluta.png', alt: 'กลูต้า' },
     { id: 2, name: 'แอมเซลซิงค์พลัส วิตามิน พรีมิกซ์', img: '/zinc.png', alt: 'ซิงค์พลัส' },
@@ -39,11 +49,14 @@ export default function Home() {
 
   const totalPages = Math.ceil(products.length / 2);
 
+  // Tier
   const baseTiers = [
-    { name: 'Silver', minPoints: 0, maxPoints: 2000, color: 'bg-gray-300', textColor: 'text-gray-800', nextTier: 'Gold' },
-    { name: 'Gold', minPoints: 2000, maxPoints: 5000, color: 'bg-yellow-500', textColor: 'text-white', nextTier: 'Platinum' },
-    { name: 'Platinum', minPoints: 5000, maxPoints: Infinity, color: 'bg-blue-600', textColor: 'text-white', nextTier: '' },
+    { name: 'Silver',   minPoints: 0,     maxPoints: 2000,  color: 'bg-gray-300',   textColor: 'text-gray-800',   nextTier: 'Gold' },
+    { name: 'Gold',     minPoints: 2000,  maxPoints: 5000,  color: 'bg-yellow-500', textColor: 'text-white',      nextTier: 'Platinum' },
+    { name: 'Platinum', minPoints: 5000,  maxPoints: Infinity, color: 'bg-blue-600', textColor: 'text-white',      nextTier: '' },
   ];
+
+  const currentPoints = userProfile?.points || 0;
 
   const currentTierIndex = baseTiers.findIndex(
     (tier) => currentPoints >= tier.minPoints && (tier.maxPoints === Infinity || currentPoints < tier.maxPoints)
@@ -56,8 +69,8 @@ export default function Home() {
       ? 100
       : Math.min(100, ((currentPoints - currentTier.minPoints) / (currentTier.maxPoints - currentTier.minPoints)) * 100);
 
-  // ดึงคะแนนจาก Backend จริง
-  const fetchUserPoints = async (lineUserId: string) => {
+  // ดึงข้อมูลผู้ใช้เต็มรูปแบบจาก Backend
+  const fetchUserFullProfile = async (lineUserId: string) => {
     try {
       const accessToken = liff.getAccessToken();
 
@@ -70,20 +83,32 @@ export default function Home() {
         },
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Backend error ${response.status}: ${errorText}`);
-      }
+      if (!response.ok) throw new Error('Failed to fetch user profile');
 
-      const data: UserProfileResponse = await response.json();
-      setCurrentPoints(data.points || 0);
+      const data: UserFullProfile = await response.json();
 
-    } catch (err: any) {
-      console.error('เชื่อมต่อ Backend ไม่ได้:', err.message);
-      setCurrentPoints(3000); // fallback
-      // alert('กำลังใช้ข้อมูลตัวอย่าง (Backend ไม่ตอบสนอง)');
+      setUserProfile({
+        points: data.points || 0,
+        title: data.title,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        phoneNumber: data.phoneNumber,
+        birthDate: data.birthDate,
+        pictureUrl: data.pictureUrl || liffProfile?.pictureUrl,
+      });
+
+    } catch (err) {
+      console.warn('ใช้ข้อมูลสำรอง (Backend ไม่ตอบสนอง)', err);
+      // Fallback: ใช้ข้อมูลจาก LINE + คะแนน mock
+      setUserProfile({
+        points: 3000,
+        firstName: liffProfile?.displayName?.split(' ')[0] || 'สมาชิก',
+        lastName: liffProfile?.displayName?.split(' ').slice(1).join(' ') || '',
+        pictureUrl: liffProfile?.pictureUrl,
+      });
     } finally {
-      setLoadingPoints(false);
+      setLoading(false);
     }
   };
 
@@ -97,9 +122,9 @@ export default function Home() {
           return;
         }
 
-        const userProfile = await liff.getProfile();
-        setProfile(userProfile);
-        await fetchUserPoints(userProfile.userId);
+        const profile = await liff.getProfile();
+        setLiffProfile(profile);
+        await fetchUserFullProfile(profile.userId);
         setIsLiffReady(true);
 
       } catch (error: any) {
@@ -114,13 +139,13 @@ export default function Home() {
 
   // Auto scroll ไป Tier ปัจจุบัน
   useEffect(() => {
-    if (isLiffReady && memberCardRef.current && !loadingPoints && currentTierIndex >= 0) {
+    if (isLiffReady && memberCardRef.current && !loading && currentTierIndex >= 0) {
       setTimeout(() => {
         const card = memberCardRef.current?.children[currentTierIndex] as HTMLElement;
         card?.scrollIntoView({ behavior: 'smooth', inline: 'start' });
-      }, 400);
+      }, 500);
     }
-  }, [isLiffReady, currentTierIndex, loadingPoints]);
+  }, [isLiffReady, currentTierIndex, loading]);
 
   const goToNextPage = () => {
     if (currentPage < totalPages - 1 && carouselRef.current) {
@@ -136,7 +161,14 @@ export default function Home() {
     }
   };
 
-  if (!isLiffReady || loadingPoints) {
+  // ชื่อเต็มสำหรับแสดง
+  const fullName = userProfile?.title
+    ? `${userProfile.title} ${userProfile.firstName} ${userProfile.lastName}`
+    : `${userProfile?.firstName || ''} ${userProfile?.lastName || ''}`.trim()
+      || liffProfile?.displayName
+      || 'สมาชิก';
+
+  if (!isLiffReady || loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
@@ -199,31 +231,54 @@ export default function Home() {
                 return (
                   <div
                     key={tier.name}
-                    className={`flex-shrink-0 w-[calc(100%-2rem)] snap-start rounded-2xl p-5 transition-all ${
+                    className={`flex-shrink-0 w-[calc(100%-2rem)] snap-start rounded-2xl p-6 transition-all shadow-lg ${
                       isCurrent ? 'border-4 border-orange-500 shadow-2xl scale-105' : 'border border-gray-200 opacity-90'
                     }`}
                     style={{ scrollSnapAlign: 'start' }}
                   >
-                    <div className={`w-full h-14 rounded-xl flex items-center justify-center mb-4 ${tier.color} ${tier.textColor}`}>
+                    {/* รูปโปรไฟล์ */}
+                    {(userProfile?.pictureUrl || liffProfile?.pictureUrl) && (
+                      <div className="flex justify-center -mt-14 mb-4">
+                        <div className="relative">
+                          <img
+                            src={userProfile?.pictureUrl || liffProfile?.pictureUrl}
+                            alt="Profile"
+                            className="w-28 h-28 rounded-full border-4 border-white shadow-xl object-cover"
+                          />
+                          <div className="absolute bottom-0 right-0 w-8 h-8 bg-orange-500 rounded-full border-4 border-white"></div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tier Badge */}
+                    <div className={`w-full h-14 rounded-xl flex items-center justify-center mb-5 ${tier.color} ${tier.textColor}`}>
                       <span className="font-bold text-xl">{tier.name} Tier</span>
                     </div>
 
-                    <p className="text-gray-800 mb-2">
-                      ยินดีต้อนรับ, <strong>{profile?.displayName || 'สมาชิก'}</strong>
-                    </p>
+                    {/* ชื่อจริงจากฟอร์ม */}
+                    <div className="text-center mb-5">
+                      <p className="text-gray-700 text-sm">ยินดีต้อนรับ</p>
+                      <p className="text-2xl font-bold text-orange-600 mt-1">{fullName}</p>
+                    </div>
 
-                    <p className="text-lg mb-4">
-                      คะแนนสะสม: <strong className="text-orange-600">{currentPoints.toLocaleString()}</strong> บาท
-                    </p>
+                    {/* คะแนน */}
+                    <div className="text-center mb-6">
+                      <p className="text-lg text-gray-700">คะแนนสะสม</p>
+                      <p className="text-3xl font-bold text-orange-600">
+                        {currentPoints.toLocaleString()} <span className="text-lg">บาท</span>
+                      </p>
+                    </div>
 
-                    <div className="w-full bg-gray-200 rounded-full h-4 mb-4 overflow-hidden">
+                    {/* Progress Bar */}
+                    <div className="w-full bg-gray-200 rounded-full h-5 mb-5 overflow-hidden">
                       <div
                         className={`h-full rounded-full transition-all duration-1000 ${tier.color}`}
                         style={{ width: `${isCurrent ? progressPercent : isAchieved ? 100 : 0}%` }}
                       />
                     </div>
 
-                    <p className={`text-sm font-medium ${isCurrent ? 'text-orange-600' : 'text-gray-600'}`}>
+                    {/* ข้อความ */}
+                    <p className={`text-center text-sm font-medium ${isCurrent ? 'text-orange-600' : 'text-gray-600'}`}>
                       {message}
                     </p>
                   </div>
@@ -251,51 +306,32 @@ export default function Home() {
 
           {/* Recommended Products */}
           <h3 className="font-bold text-lg mb-4 text-gray-800">สินค้าแนะนำสำหรับคุณ</h3>
-
           <div className="relative">
-            <button
-              onClick={goToPrevPage}
-              disabled={currentPage === 0}
-              className={`absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-3 shadow-lg border-2 border-orange-200 transition-all ${
-                currentPage === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:border-orange-400'
-              }`}
-            >
+            <button onClick={goToPrevPage} disabled={currentPage === 0}
+              className={`absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-3 shadow-lg border-2 border-orange-200 transition-all ${currentPage === 0 ? 'opacity-50' : 'hover:border-orange-400'}`}>
               <i className="fas fa-chevron-left text-orange-500 text-xl"></i>
             </button>
 
-            <div
-              ref={carouselRef}
-              className="flex space-x-4 overflow-x-auto pb-6 px-12 scrollbar-hide snap-x snap-mandatory"
-              style={{ scrollSnapType: 'x mandatory' }}
-            >
-              {products.map((product) => (
-                <div
-                  key={product.id}
-                  className="flex-shrink-0 w-40 snap-start bg-white rounded-2xl border-2 border-orange-100 shadow-lg p-4 flex flex-col items-center transition-transform hover:scale-105"
-                >
+            <div ref={carouselRef} className="flex space-x-4 overflow-x-auto pb-6 px-12 scrollbar-hide snap-x snap-mandatory" style={{ scrollSnapType: 'x mandatory' }}>
+              {products.map(p => (
+                <div key={p.id} className="flex-shrink-0 w-40 snap-start bg-white rounded-2xl border-2 border-orange-100 shadow-lg p-4 flex flex-col items-center hover:scale-105 transition-transform">
                   <div className="w-full h-32 bg-orange-50 rounded-xl flex items-center justify-center mb-3">
-                    <img src={product.img} alt={product.alt} className="w-20 h-20 object-contain" />
+                    <img src={p.img} alt={p.alt} className="w-20 h-20 object-contain" />
                   </div>
-                  <h4 className="text-sm font-medium text-center line-clamp-2 text-gray-800">
-                    {product.name}
-                  </h4>
-                  <button className="mt-3 w-full bg-orange-500 hover:bg-orange-600 text-white text-sm py-2.5 rounded-full font-medium transition-colors">
+                  <h4 className="text-sm font-medium text-center line-clamp-2 text-gray-800">{p.name}</h4>
+                  <button className="mt-3 w-full bg-orange-500 hover:bg-orange-600 text-white text-sm py-2.5 rounded-full font-medium">
                     เพิ่มลงตะกร้า
                   </button>
                 </div>
               ))}
             </div>
 
-            <button
-              onClick={goToNextPage}
-              disabled={currentPage >= totalPages - 1}
-              className={`absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-3 shadow-lg border-2 border-orange-200 transition-all ${
-                currentPage >= totalPages - 1 ? 'opacity-50 cursor-not-allowed' : 'hover:border-orange-400'
-              }`}
-            >
+            <button onClick={goToNextPage} disabled={currentPage >= totalPages - 1}
+              className={`absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-3 shadow-lg border-2 border-orange-200 transition-all ${currentPage >= totalPages - 1 ? 'opacity-50' : 'hover:border-orange-400'}`}>
               <i className="fas fa-chevron-right text-orange-500 text-xl"></i>
             </button>
           </div>
+
         </div>
       </div>
     </>
