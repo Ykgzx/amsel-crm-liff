@@ -10,6 +10,7 @@ import {
   Loader2,
   Save,
   AlertCircle,
+  XCircle,
 } from "lucide-react";
 import liff from "@line/liff";
 
@@ -26,6 +27,14 @@ interface UserProfile {
   birthdate: string;
 }
 
+interface Errors {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  birthdate?: string;
+}
+
 export default function EditProfilePage() {
   const [linePictureUrl, setLinePictureUrl] = useState<string | null>(null);
 
@@ -38,11 +47,12 @@ export default function EditProfilePage() {
     birthdate: "",
   });
 
+  const [errors, setErrors] = useState<Errors>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  // ดึงรูปจาก LINE LIFF
+  // ดึงรูปจาก LINE
   useEffect(() => {
     const initLiff = async () => {
       try {
@@ -58,7 +68,7 @@ export default function EditProfilePage() {
     initLiff();
   }, []);
 
-  // ดึงข้อมูลโปรไฟล์จาก backend
+  // ดึงข้อมูลโปรไฟล์เดิม
   useEffect(() => {
     const fetchProfile = async () => {
       try {
@@ -88,7 +98,46 @@ export default function EditProfilePage() {
     fetchProfile();
   }, []);
 
-  // บันทึกจริงเมื่อกด "ตกลง" ใน popup
+  // ฟังก์ชันตรวจสอบข้อมูล
+  const validateForm = (): boolean => {
+    const newErrors: Errors = {};
+
+    if (!profile.firstName.trim()) {
+      newErrors.firstName = "กรุณากรอกชื่อจริง";
+    }
+
+    if (!profile.lastName.trim()) {
+      newErrors.lastName = "กรุณากรอกนามสกุล";
+    }
+
+    if (!profile.email.trim()) {
+      newErrors.email = "กรุณากรอกอีเมล";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.email)) {
+      newErrors.email = "รูปแบบอีเมลไม่ถูกต้อง";
+    }
+
+    if (!profile.phone.trim()) {
+      newErrors.phone = "กรุณากรอกเบอร์โทรศัพท์";
+    } else if (!/^0[6-9]\d{8}$/.test(profile.phone.replace(/[-\s]/g, ""))) {
+      newErrors.phone = "เบอร์โทรศัพท์ต้องเป็น 10 หลัก เริ่มต้นด้วย 06-09";
+    }
+
+    if (!profile.birthdate) {
+      newErrors.birthdate = "กรุณาเลือกวันเกิด";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // เมื่อกดบันทึก → ตรวจสอบก่อน
+  const handleSaveClick = () => {
+    if (validateForm()) {
+      setShowConfirm(true);
+    }
+  };
+
+  // บันทึกจริงเมื่อกด "ตกลง"
   const confirmSave = async () => {
     setSaving(true);
     setShowConfirm(false);
@@ -176,70 +225,101 @@ export default function EditProfilePage() {
               </div>
             </div>
 
+            {/* ชื่อ */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">ชื่อ</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">ชื่อ <span className="text-red-500">*</span></label>
               <input
                 type="text"
                 value={profile.firstName}
                 onChange={(e) => setProfile({ ...profile, firstName: e.target.value })}
-                className="w-full px-5 py-4 bg-orange-50 border border-orange-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300"
+                className={`w-full px-5 py-4 bg-orange-50 border rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300 ${errors.firstName ? "border-red-500" : "border-orange-200"}`}
               />
+              {errors.firstName && (
+                <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                  <XCircle className="w-4 h-4" /> {errors.firstName}
+                </p>
+              )}
             </div>
 
+            {/* นามสกุล */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">นามสกุล</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">นามสกุล <span className="text-red-500">*</span></label>
               <input
                 type="text"
                 value={profile.lastName}
                 onChange={(e) => setProfile({ ...profile, lastName: e.target.value })}
-                className="w-full px-5 py-4 bg-orange-50 border border-orange-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300"
+                className={`w-full px-5 py-4 bg-orange-50 border rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300 ${errors.lastName ? "border-red-500" : "border-orange-200"}`}
               />
+              {errors.lastName && (
+                <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                  <XCircle className="w-4 h-4" /> {errors.lastName}
+                </p>
+              )}
             </div>
 
+            {/* อีเมล */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                <Mail className="inline w-5 h-5 mr-1 text-orange-600" /> อีเมล
+                <Mail className="inline w-5 h-5 mr-1 text-orange-600" /> อีเมล <span className="text-red-500">*</span>
               </label>
               <input
                 type="email"
                 value={profile.email}
                 onChange={(e) => setProfile({ ...profile, email: e.target.value })}
                 placeholder="you@example.com"
-                className="w-full px-5 py-4 bg-orange-50 border border-orange-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300"
+                className={`w-full px-5 py-4 bg-orange-50 border rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300 ${errors.email ? "border-red-500" : "border-orange-200"}`}
               />
+              {errors.email && (
+                <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                  <XCircle className="w-4 h-4" /> {errors.email}
+                </p>
+              )}
             </div>
 
+            {/* เบอร์โทร */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                <Phone className="inline w-5 h-5 mr-1 text-orange-600" /> เบอร์โทรศัพท์
+                <Phone className="inline w-5 h-5 mr-1 text-orange-600" /> เบอร์โทรศัพท์ <span className="text-red-500">*</span>
               </label>
               <input
                 type="tel"
                 value={profile.phone}
                 onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                placeholder="08x xxx xxxx"
-                className="w-full px-5 py-4 bg-orange-50 border border-orange-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300"
+                placeholder="0812345678"
+                className={`w-full px-5 py-4 bg-orange-50 border rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300 ${errors.phone ? "border-red-500" : "border-orange-200"}`}
               />
+              {errors.phone && (
+                <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                  <XCircle className="w-4 h-4" /> {errors.phone}
+                </p>
+              )}
             </div>
 
+            {/* วันเกิด */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                <Calendar className="inline w-5 h-5 mr-1 text-orange-600" /> วันเกิด
+                <Calendar className="inline w-5 h-5 mr-1 text-orange-600" /> วันเกิด <span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
                 value={profile.birthdate}
                 onChange={(e) => setProfile({ ...profile, birthdate: e.target.value })}
-                className="w-full px-5 py-4 bg-orange-50 border border-orange-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300"
+                className={`w-full px-5 py-4 bg-orange-50 border rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300 ${errors.birthdate ? "border-red-500" : "border-orange-200"}`}
               />
+              {errors.birthdate && (
+                <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                  <XCircle className="w-4 h-4" /> {errors.birthdate}
+                </p>
+              )}
             </div>
 
+            {/* ปุ่ม */}
             <div className="flex gap-4 pt-8">
               <button className="flex-1 py-4 border-2 border-orange-200 text-gray-700 font-bold rounded-2xl hover:bg-orange-50 transition">
                 ยกเลิก
               </button>
               <button
-                onClick={() => setShowConfirm(true)}
+                onClick={handleSaveClick}
                 disabled={saving}
                 className="flex-1 py-4 bg-orange-500 text-white font-bold rounded-2xl hover:bg-orange-600 shadow-lg flex items-center justify-center gap-2 transition transform hover:scale-105 disabled:opacity-70"
               >
