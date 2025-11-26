@@ -41,7 +41,7 @@ export default function RegisterPage() {
   });
 
   const [errors, setErrors] = useState<Errors>({});
-  const today = new Date().toISOString().split('T')[0]; // วันปัจจุบัน
+  const today = new Date().toISOString().split('T')[0]; // วันนี้
 
   useEffect(() => {
     const initLiff = async () => {
@@ -70,7 +70,7 @@ export default function RegisterPage() {
         }
         setIdToken(token);
 
-        // ดึง email จาก ID Token
+        // ดึง email จาก ID Token (ถ้ามี)
         const decoded = liff.getDecodedIDToken();
         if (decoded?.email) {
           setFormData(prev => ({ ...prev, email: decoded.email as string }));
@@ -107,7 +107,7 @@ export default function RegisterPage() {
     }
   }, [isRegistered]);
 
-  // Validation ฟังก์ชัน
+  // Validation ทุกช่องบังคับกรอก
   const validateForm = (): boolean => {
     const newErrors: Errors = {};
 
@@ -123,18 +123,22 @@ export default function RegisterPage() {
       newErrors.lastName = "กรุณากรอกนามสกุล";
     }
 
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    if (!formData.email.trim()) {
+      newErrors.email = "กรุณากรอกอีเมล";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = "รูปแบบอีเมลไม่ถูกต้อง";
     }
 
     const cleanPhone = formData.phoneNumber.replace(/\D/g, "");
-    if (formData.phoneNumber && cleanPhone.length > 0) {
-      if (cleanPhone.length !== 10 || !/^0[6-9]/.test(cleanPhone)) {
-        newErrors.phoneNumber = "เบอร์โทรศัพท์ต้องเป็น 10 หลัก เริ่มต้นด้วย 06-09";
-      }
+    if (!cleanPhone) {
+      newErrors.phoneNumber = "กรุณากรอกเบอร์โทรศัพท์";
+    } else if (cleanPhone.length !== 10 || !/^0[6-9]/.test(cleanPhone)) {
+      newErrors.phoneNumber = "เบอร์โทรศัพท์ต้องเป็น 10 หลัก เริ่มต้นด้วย 06-09";
     }
 
-    if (formData.birthDate && formData.birthDate > today) {
+    if (!formData.birthDate) {
+      newErrors.birthDate = "กรุณาเลือกวันเกิด";
+    } else if (formData.birthDate > today) {
       newErrors.birthDate = "วันเกิดต้องไม่เกินวันปัจจุบัน";
     }
 
@@ -146,7 +150,7 @@ export default function RegisterPage() {
     e.preventDefault();
 
     if (!validateForm()) {
-      return; // หยุดถ้ามี error
+      return;
     }
 
     if (!idToken) {
@@ -158,9 +162,9 @@ export default function RegisterPage() {
       title: formData.title,
       firstName: formData.firstName.trim(),
       lastName: formData.lastName.trim(),
-      email: formData.email || null,
-      phoneNumber: formData.phoneNumber ? formData.phoneNumber.replace(/\D/g, "") : null,
-      birthDate: formData.birthDate ? new Date(formData.birthDate).toISOString() : null,
+      email: formData.email.trim(),
+      phoneNumber: formData.phoneNumber.replace(/\D/g, ""), // ส่งเฉพาะตัวเลข
+      birthDate: new Date(formData.birthDate).toISOString(),
     };
 
     try {
@@ -284,15 +288,17 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            {/* อีเมล (optional แต่ถ้ากรอกต้องถูก) */}
+            {/* อีเมล - บังคับกรอก */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">อีเมล (ไม่บังคับ)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                อีเมล <span className="text-red-500">*</span>
+              </label>
               <input
                 type="email"
                 className={`w-full px-4 py-3 border rounded-xl bg-orange-50 focus:ring-2 focus:ring-orange-500 ${errors.email ? "border-red-500" : "border-orange-200"}`}
                 value={formData.email}
                 onChange={e => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                placeholder="กรอกอีเมลเพิ่มเติม"
+                placeholder="you@example.com"
               />
               {errors.email && (
                 <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
@@ -301,13 +307,16 @@ export default function RegisterPage() {
               )}
             </div>
 
-            {/* เบอร์โทร (optional แต่ถ้ากรอกต้อง 10 หลัก) */}
+            {/* เบอร์โทร - บังคับกรอก + 10 หลัก */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">เบอร์โทรศัพท์ (ไม่บังคับ)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                เบอร์โทรศัพท์ <span className="text-red-500">*</span>
+              </label>
               <input
                 type="text"
                 inputMode="numeric"
                 maxLength={10}
+                placeholder="0812345678"
                 className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-orange-500 ${errors.phoneNumber ? "border-red-500" : "border-orange-200"}`}
                 value={formData.phoneNumber}
                 onChange={e => {
@@ -316,7 +325,6 @@ export default function RegisterPage() {
                     setFormData(prev => ({ ...prev, phoneNumber: value }));
                   }
                 }}
-                placeholder="0812345678"
               />
               {errors.phoneNumber && (
                 <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
@@ -325,9 +333,11 @@ export default function RegisterPage() {
               )}
             </div>
 
-            {/* วันเกิด (optional แต่ห้ามเกินวันนี้) */}
+            {/* วันเกิด - บังคับเลือก + ห้ามเกินวันนี้ */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">วันเกิด (ไม่บังคับ)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                วันเกิด <span className="text-red-500">*</span>
+              </label>
               <input
                 type="date"
                 max={today}

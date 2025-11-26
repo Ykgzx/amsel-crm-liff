@@ -88,7 +88,7 @@ export default function Home() {
   const fetchUserFullProfile = async (lineUserId: string) => {
     try {
       const accessToken = liff.getAccessToken();
-
+      console.log(accessToken)
       const response = await fetch(`${BACKEND_URL}/api/users/profile`, {
         method: 'GET',
         headers: {
