@@ -23,16 +23,16 @@ interface UserProfile {
   firstName: string;
   lastName: string;
   email: string;
-  phone: string;
-  birthdate: string;
+  phoneNumber: string;
+  birthDate: string;
 }
 
 interface Errors {
   firstName?: string;
   lastName?: string;
   email?: string;
-  phone?: string;
-  birthdate?: string;
+  phoneNumber?: string;
+  birthDate?: string;
 }
 
 export default function EditProfilePage() {
@@ -43,8 +43,8 @@ export default function EditProfilePage() {
     firstName: "",
     lastName: "",
     email: "",
-    phone: "",
-    birthdate: "",
+    phoneNumber: "",
+    birthDate: "",
   });
 
   const [errors, setErrors] = useState<Errors>({});
@@ -97,8 +97,8 @@ export default function EditProfilePage() {
             firstName: data.firstName || "",
             lastName: data.lastName || "",
             email: data.email || "",
-            phone: data.phone || "",
-            birthdate: data.birthdate || "",
+            phoneNumber: data.phone || "",
+            birthDate: data.birthdate || "",
           });
         }
       } catch (err) {
@@ -129,17 +129,17 @@ export default function EditProfilePage() {
       newErrors.email = "รูปแบบอีเมลไม่ถูกต้อง";
     }
 
-    const cleanPhone = profile.phone.replace(/\D/g, ""); // ลบทุกอย่างที่ไม่ใช่ตัวเลข
+    const cleanPhone = profile.phoneNumber.replace(/\D/g, ""); // ลบทุกอย่างที่ไม่ใช่ตัวเลข
     if (!cleanPhone) {
-      newErrors.phone = "กรุณากรอกเบอร์โทรศัพท์";
+      newErrors.phoneNumber = "กรุณากรอกเบอร์โทรศัพท์";
     } else if (cleanPhone.length !== 10 || !/^0[6-9]/.test(cleanPhone)) {
-      newErrors.phone = "เบอร์โทรศัพท์ต้องเป็น 10 หลัก เริ่มต้นด้วย 06-09";
+      newErrors.phoneNumber = "เบอร์โทรศัพท์ต้องเป็น 10 หลัก เริ่มต้นด้วย 06-09";
     }
 
-    if (!profile.birthdate) {
-      newErrors.birthdate = "กรุณาเลือกวันเกิด";
-    } else if (profile.birthdate > today) {
-      newErrors.birthdate = "วันเกิดต้องไม่เกินวันปัจจุบัน";
+    if (!profile.birthDate) {
+      newErrors.birthDate = "กรุณาเลือกวันเกิด";
+    } else if (profile.birthDate > today) {
+      newErrors.birthDate = "วันเกิดต้องไม่เกินวันปัจจุบัน";
     }
 
     setErrors(newErrors);
@@ -172,7 +172,7 @@ export default function EditProfilePage() {
         },
         body: JSON.stringify({
           ...profile,
-          phone: profile.phone.replace(/\D/g, ""), // ส่งเฉพาะตัวเลขไป backend
+          phone: profile.phoneNumber.replace(/\D/g, ""), // ส่งเฉพาะตัวเลขไป backend
         }),
       });
 
@@ -311,19 +311,19 @@ export default function EditProfilePage() {
                 type="text"
                 inputMode="numeric"
                 maxLength={10}
-                value={profile.phone}
+                value={profile.phoneNumber}
                 onChange={(e) => {
                   const value = e.target.value.replace(/\D/g, ""); // รับเฉพาะตัวเลข
                   if (value.length <= 10) {
-                    setProfile({ ...profile, phone: value });
+                    setProfile({ ...profile, phoneNumber: value });
                   }
                 }}
                 placeholder="0812345678"
-                className={`w-full px-5 py-4 bg-orange-50 border rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300 ${errors.phone ? "border-red-500" : "border-orange-200"}`}
+                className={`w-full px-5 py-4 bg-orange-50 border rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300 ${errors.phoneNumber ? "border-red-500" : "border-orange-200"}`}
               />
-              {errors.phone && (
+              {errors.phoneNumber && (
                 <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
-                  <XCircle className="w-4 h-4" /> {errors.phone}
+                  <XCircle className="w-4 h-4" /> {errors.phoneNumber}
                 </p>
               )}
             </div>
@@ -336,13 +336,13 @@ export default function EditProfilePage() {
               <input
                 type="date"
                 max={today} // สำคัญ: ปิดกั้นไม่ให้เลือกวันเกินวันนี้
-                value={profile.birthdate}
-                onChange={(e) => setProfile({ ...profile, birthdate: e.target.value })}
-                className={`w-full px-5 py-4 bg-orange-50 border rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300 ${errors.birthdate ? "border-red-500" : "border-orange-200"}`}
+                value={profile.birthDate}
+                onChange={(e) => setProfile({ ...profile, birthDate: e.target.value })}
+                className={`w-full px-5 py-4 bg-orange-50 border rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300 ${errors.birthDate ? "border-red-500" : "border-orange-200"}`}
               />
-              {errors.birthdate && (
+              {errors.birthDate && (
                 <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
-                  <XCircle className="w-4 h-4" /> {errors.birthdate}
+                  <XCircle className="w-4 h-4" /> {errors.birthDate}
                 </p>
               )}
             </div>
