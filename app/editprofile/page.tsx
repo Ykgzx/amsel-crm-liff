@@ -54,17 +54,7 @@ export default function EditprofilePage() {
               </label>
             </div>
 
-            {/* Points Card (เหมือนหน้า Reward) */}
-            <div className="mt-8 inline-flex items-center gap-3 bg-orange-50 border-2 border-orange-200 rounded-2xl px-8 py-4 shadow-md">
-              <Gift className="w-8 h-8 text-orange-600" />
-              <div>
-                <p className="text-gray-600 text-sm">พอยต์ของคุณ</p>
-                <p className="text-3xl font-bold text-orange-600">
-                  1,250 <span className="text-lg">Pts</span>
-                </p>
-              </div>
-              <Star className="w-8 h-8 text-orange-500 fill-orange-500" />
-            </div>
+            
           </div>
 
           {/* Form Card */}
