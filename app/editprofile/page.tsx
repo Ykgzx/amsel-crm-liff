@@ -23,7 +23,7 @@ interface UserProfile {
   lastName: string;
   email: string;
   phoneNumber: string;
-  birthDate: string;
+  birthDate: string; // รูปแบบ YYYY-MM-DD สำหรับ input date
 }
 
 interface Errors {
@@ -98,8 +98,13 @@ export default function EditProfilePage() {
             firstName: data.firstName || "",
             lastName: data.lastName || "",
             email: data.email || "",
-            phoneNumber: data.phoneNumber || data.phone || "", // รองรับทั้งสองแบบ
-            birthDate: (data.birthDate || data.birthdate || "").split("T")[0], // แปลงเป็น YYYY-MM-DD
+            phoneNumber: data.phoneNumber || data.phone || "",
+            // แปลงจาก ISO datetime → YYYY-MM-DD
+            birthDate: data.birthDate
+              ? data.birthDate.split("T")[0]
+              : data.birthdate
+              ? data.birthdate.split("T")[0]
+              : "",
           });
         }
       } catch (err) {
@@ -148,7 +153,7 @@ export default function EditProfilePage() {
     }
   };
 
-  // บันทึกข้อมูล – ใช้ชื่อ field ตรงกับ DB และ backend ล่าสุด
+  // บันทึกข้อมูล – สำคัญมาก: birthDate ต้องเป็น ISO datetime
   const confirmSave = async () => {
     setSaving(true);
     setShowConfirm(false);
@@ -167,11 +172,11 @@ export default function EditProfilePage() {
         firstName: profile.firstName.trim(),
         lastName: profile.lastName.trim(),
         email: profile.email.trim(),
-        phoneNumber: profile.phoneNumber.replace(/\D/g, ""),  // ต้องเป็น phoneNumber
-        birthDate: profile.birthDate,                         // ต้องเป็น birthDate (มี D ตัวใหญ่)
+        phoneNumber: profile.phoneNumber.replace(/\D/g, ""),
+        birthDate: profile.birthDate ? `${profile.birthDate}T00:00:00.000Z` : null, // แก้ตรงนี้!
       };
 
-      console.log("ส่งไป backend:", payload);
+      console.log("ส่งไป backend (ISO datetime):", payload);
 
       const res = await fetch(`${BACKEND_URL}/api/users/profile`, {
         method: "PUT",
