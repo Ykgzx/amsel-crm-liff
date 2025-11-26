@@ -1,8 +1,23 @@
+// src/components/StoreMap.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
-import ReactMapGL, { Marker, Popup, ViewStateChangeEvent } from 'react-map-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import { useEffect, useState } from 'react';
+
+// แก้ปัญหาไอคอนหายใน React
+import L from 'leaflet';
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+// แทนที่ไอคอนเริ่มต้น
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: markerIcon2x.src,
+  iconUrl: markerIcon.src,
+  shadowUrl: markerShadow.src,
+});
 
 export type Store = {
   id: number;
@@ -18,76 +33,55 @@ type StoreMapProps = {
 };
 
 export default function StoreMap({ userLocation, stores }: StoreMapProps) {
-  const [viewport, setViewport] = useState({
-    latitude: userLocation?.lat || 13.7563,
-    longitude: userLocation?.lng || 100.5018,
-    zoom: 12,
-  });
-
-  const [selectedStore, setSelectedStore] = useState<Store | null>(null);
+  const [mapCenter, setMapCenter] = useState<[number, number]>([13.7563, 100.5018]); // [lat, lng]
+  const [zoom, setZoom] = useState(12);
 
   useEffect(() => {
     if (userLocation) {
-      setViewport({
-        latitude: userLocation.lat,
-        longitude: userLocation.lng,
-        zoom: 13,
-      });
+      setMapCenter([userLocation.lat, userLocation.lng]);
+      setZoom(13);
     }
   }, [userLocation]);
 
   return (
-    <ReactMapGL
-      {...viewport}
-      onMove={(evt: ViewStateChangeEvent) => setViewport(evt.viewState)}
-      mapStyle="https://tiles.stadiamaps.com/styles/alidade_smooth.json"
-      mapLib={require('maplibre-gl')}
+    <MapContainer
+      center={mapCenter}
+      zoom={zoom}
+      scrollWheelZoom={false}
       style={{
         width: '100%',
         height: '300px',
         borderRadius: '1.5rem',
         border: '2px solid #fed7aa',
+        zIndex: 0,
       }}
-      attributionControl={false}
     >
+      {/* Tile จาก OpenStreetMap */}
+      <TileLayer
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      />
+
+      {/* Marker ผู้ใช้ */}
       {userLocation && (
-        <Marker latitude={userLocation.lat} longitude={userLocation.lng}>
-          <div className="w-6 h-6 bg-blue-600 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white text-xs font-bold">
-            คุณ
-          </div>
+        <Marker position={[userLocation.lat, userLocation.lng]}>
+          <Popup>
+            <div className="font-bold text-gray-900">ตำแหน่งของคุณ</div>
+          </Popup>
         </Marker>
       )}
 
+      {/* Marker ร้านค้า */}
       {stores.map((store) => (
-        <Marker
-          key={store.id}
-          latitude={store.lat}
-          longitude={store.lng}
-          onClick={(e: { originalEvent: MouseEvent }) => {
-            e.originalEvent.stopPropagation();
-            setSelectedStore(store);
-          }}
-        >
-          <div className="w-6 h-6 bg-orange-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white text-xs font-bold cursor-pointer">
-            {store.id}
-          </div>
+        <Marker key={store.id} position={[store.lat, store.lng]}>
+          <Popup>
+            <div>
+              <h4 className="font-bold text-gray-900">{store.name}</h4>
+              <p className="text-sm text-gray-600">{store.address}</p>
+            </div>
+          </Popup>
         </Marker>
       ))}
-
-      {selectedStore && (
-        <Popup
-          latitude={selectedStore.lat}
-          longitude={selectedStore.lng}
-          onClose={() => setSelectedStore(null)}
-          closeButton={true}
-          closeOnClick={false}
-        >
-          <div>
-            <h4 className="font-bold text-gray-900">{selectedStore.name}</h4>
-            <p className="text-sm text-gray-600">{selectedStore.address}</p>
-          </div>
-        </Popup>
-      )}
-    </ReactMapGL>
+    </MapContainer>
   );
 }
