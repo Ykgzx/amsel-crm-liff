@@ -383,20 +383,29 @@ export default function EditProfilePage() {
               {errors.birthDate && <p className="mt-1 text-sm text-red-600 flex items-center gap-1"><XCircle className="w-4 h-4" /> {errors.birthDate}</p>}
             </div>
 
-            <div className="flex justify-center items-center gap-4 pt-8">
-                <Link href="/" className="flex-1">
-                    <button className="w-full py-4 border-2 border-orange-200 text-gray-700 font-bold rounded-2xl hover:bg-orange-50 transition">
-                        ยกเลิก
+            <div className="flex justify-center items-center pt-8">
+                <div className="grid grid-cols-2 gap-4 w-full max-w-md mx-auto">
+                    {/* ปุ่มยกเลิก */}
+                    <Link href="/" className="w-full">
+                        <button className="w-full h-full min-h-14 py-4 px-6 border-2 border-orange-200 text-gray-700 font-bold rounded-2xl hover:bg-orange-50 transition-all duration-200 flex items-center justify-center">
+                            ยกเลิก
+                        </button>
+                    </Link>
+
+                    {/* ปุ่มบันทึก */}
+                    <button
+                        onClick={handleSaveClick}
+                        disabled={saving}
+                        className="w-full h-full min-h-14 py-4 px-6 bg-orange-500 text-white font-bold rounded-2xl hover:bg-orange-600 shadow-lg flex items-center justify-center gap-2 transition-all duration-200 hover:scale-105 disabled:opacity-70 disabled:cursor-not-allowed"
+                    >
+                        {saving ? (
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                            <Save className="w-5 h-5" />
+                        )}
+                        <span>{saving ? "กำลังบันทึก..." : "บันทึกการเปลี่ยนแปลง"}</span>
                     </button>
-                </Link>
-                <button
-                    onClick={handleSaveClick}
-                    disabled={saving}
-                    className="flex-1 py-4 bg-orange-500 text-white font-bold rounded-2xl hover:bg-orange-600 shadow-lg flex items-center justify-center gap-2 transition transform hover:scale-105 disabled:opacity-70"
-                >
-                    {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                    {saving ? "กำลังบันทึก..." : "บันทึกการเปลี่ยนแปลง"}
-                </button>
+                </div>
             </div>
           </div>
         </div>
