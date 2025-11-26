@@ -9,10 +9,9 @@ import {
   ChevronDown,
   Loader2,
   Save,
-  AlertCircle,
-  XCircle,
 } from "lucide-react";
 import liff from "@line/liff";
+import Swal from "sweetalert2";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 const TITLE_OPTIONS = ["นาย", "นาง", "นางสาว"];
@@ -23,7 +22,7 @@ interface UserProfile {
   lastName: string;
   email: string;
   phoneNumber: string;
-  birthDate: string; // รูปแบบ YYYY-MM-DD สำหรับ input date
+  birthDate: string;
 }
 
 interface Errors {
@@ -48,11 +47,9 @@ export default function EditProfilePage() {
   const [errors, setErrors] = useState<Errors>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
 
   const today = new Date().toISOString().split("T")[0];
 
-  // ดึงรูปจาก LINE
   useEffect(() => {
     const initLiff = async () => {
       try {
@@ -68,13 +65,11 @@ export default function EditProfilePage() {
     initLiff();
   }, []);
 
-  // ดึงข้อมูลโปรไฟล์
   useEffect(() => {
     const fetchProfile = async () => {
       await liff.ready;
       const accessToken = liff.getAccessToken();
       if (!accessToken) {
-        console.warn("ไม่มี Access Token");
         setLoading(false);
         return;
       }
@@ -91,15 +86,12 @@ export default function EditProfilePage() {
 
         if (res.ok) {
           const data = await res.json();
-          console.log("ข้อมูลจาก backend:", data);
-
           setProfile({
             title: data.title || "นาย",
             firstName: data.firstName || "",
             lastName: data.lastName || "",
             email: data.email || "",
             phoneNumber: data.phoneNumber || data.phone || "",
-            // แปลงจาก ISO datetime → YYYY-MM-DD
             birthDate: data.birthDate
               ? data.birthDate.split("T")[0]
               : data.birthdate
@@ -117,7 +109,6 @@ export default function EditProfilePage() {
     fetchProfile();
   }, []);
 
-  // ตรวจสอบฟอร์ม
   const validateForm = (): boolean => {
     const newErrors: Errors = {};
 
@@ -147,21 +138,39 @@ export default function EditProfilePage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSaveClick = () => {
-    if (validateForm()) {
-      setShowConfirm(true);
+  const handleSaveClick = async () => {
+    if (!validateForm()) return;
+
+    const result = await Swal.fire({
+      title: "ยืนยันการบันทึกข้อมูล?",
+      text: "ระบบจะอัปเดตข้อมูลโปรไฟล์ของคุณ",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "ตกลง บันทึกเลย",
+      cancelButtonText: "ยกเลิก",
+      reverseButtons: true,
+      buttonsStyling: false,
+      customClass: {
+        popup: "rounded-3xl shadow-2xl",
+        confirmButton:
+          "px-8 py-3 bg-orange-500 text-white font-bold rounded-2xl hover:bg-orange-600 shadow-lg transition mx-2",
+        cancelButton:
+          "px-8 py-3 bg-gray-200 text-gray-700 font-bold rounded-2xl hover:bg-gray-300 transition mx-2",
+      },
+    });
+
+    if (result.isConfirmed) {
+      confirmSave();
     }
   };
 
-  // บันทึกข้อมูล – สำคัญมาก: birthDate ต้องเป็น ISO datetime
   const confirmSave = async () => {
     setSaving(true);
-    setShowConfirm(false);
 
     await liff.ready;
     const accessToken = liff.getAccessToken();
     if (!accessToken) {
-      alert("ไม่พบ Access Token");
+      Swal.fire("ผิดพลาด", "ไม่พบ Access Token", "error");
       setSaving(false);
       return;
     }
@@ -173,10 +182,8 @@ export default function EditProfilePage() {
         lastName: profile.lastName.trim(),
         email: profile.email.trim(),
         phoneNumber: profile.phoneNumber.replace(/\D/g, ""),
-        birthDate: profile.birthDate ? `${profile.birthDate}T00:00:00.000Z` : null, // แก้ตรงนี้!
+        birthDate: profile.birthDate ? `${profile.birthDate}T00:00:00.000Z` : null,
       };
-
-      console.log("ส่งไป backend (ISO datetime):", payload);
 
       const res = await fetch(`${BACKEND_URL}/api/users/profile`, {
         method: "PUT",
@@ -189,15 +196,20 @@ export default function EditProfilePage() {
       });
 
       if (res.ok) {
-        alert("บันทึกข้อมูลสำเร็จแล้วค่ะ");
+        Swal.fire({
+          icon: "success",
+          title: "บันทึกสำเร็จ!",
+          text: "ข้อมูลโปรไฟล์ของคุณได้รับการอัปเดตแล้ว",
+          timer: 2000,
+          showConfirmButton: false,
+          customClass: { popup: "rounded-3xl" },
+        });
       } else {
         const err = await res.text();
-        console.error("บันทึกไม่สำเร็จ:", res.status, err);
-        alert("เกิดข้อผิดพลาด: " + (err || "กรุณาลองใหม่"));
+        Swal.fire("เกิดข้อผิดพลาด", err || "กรุณาลองใหม่", "error");
       }
     } catch (err) {
-      console.error("Network error:", err);
-      alert("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้");
+      Swal.fire("เชื่อมต่อไม่ได้", "ไม่สามารถติดต่อเซิร์ฟเวอร์ได้", "error");
     } finally {
       setSaving(false);
     }
@@ -218,9 +230,16 @@ export default function EditProfilePage() {
     <>
       <Navbar />
 
+      {/* Backdrop blur สวย ๆ */}
+      <style jsx global>{`
+        .swal2-backdrop-show {
+          backdrop-filter: blur(10px) !important;
+          background-color: rgba(0, 0, 0, 0.4) !important;
+        }
+      `}</style>
+
       <div className="bg-white min-h-screen pt-32 pb-16">
         <div className="max-w-md mx-auto px-6">
-
           {/* Header */}
           <div className="mb-10 text-center">
             <div className="bg-orange-500 rounded-full px-8 py-3 w-fit mx-auto mb-6 shadow-lg">
@@ -246,7 +265,7 @@ export default function EditProfilePage() {
 
           {/* ฟอร์ม */}
           <div className="bg-white rounded-3xl border-2 border-orange-100 shadow-xl p-6 space-y-5">
-
+            {/* คำนำหน้าชื่อ */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">คำนำหน้าชื่อ</label>
               <div className="relative">
@@ -263,6 +282,7 @@ export default function EditProfilePage() {
               </div>
             </div>
 
+            {/* ชื่อจริง */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">ชื่อ <span className="text-red-500">*</span></label>
               <input
@@ -271,9 +291,10 @@ export default function EditProfilePage() {
                 onChange={(e) => setProfile({ ...profile, firstName: e.target.value })}
                 className={`w-full px-5 py-4 bg-orange-50 border rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300 ${errors.firstName ? "border-red-500" : "border-orange-200"}`}
               />
-              {errors.firstName && <p className="mt-1 text-sm text-red-600 flex items-center gap-1"><XCircle className="w-4 h-4" /> {errors.firstName}</p>}
+              {errors.firstName && <p className="mt-1 text-sm text-red-600">กรุณากรอกชื่อจริง</p>}
             </div>
 
+            {/* นามสกุล */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">นามสกุล <span className="text-red-500">*</span></label>
               <input
@@ -282,9 +303,10 @@ export default function EditProfilePage() {
                 onChange={(e) => setProfile({ ...profile, lastName: e.target.value })}
                 className={`w-full px-5 py-4 bg-orange-50 border rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300 ${errors.lastName ? "border-red-500" : "border-orange-200"}`}
               />
-              {errors.lastName && <p className="mt-1 text-sm text-red-600 flex items-center gap-1"><XCircle className="w-4 h-4" /> {errors.lastName}</p>}
+              {errors.lastName && <p className="mt-1 text-sm text-red-600">กรุณากรอกนามสกุล</p>}
             </div>
 
+            {/* อีเมล */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 <Mail className="inline w-5 h-5 mr-1 text-orange-600" /> อีเมล <span className="text-red-500">*</span>
@@ -296,9 +318,10 @@ export default function EditProfilePage() {
                 placeholder="you@example.com"
                 className={`w-full px-5 py-4 bg-orange-50 border rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300 ${errors.email ? "border-red-500" : "border-orange-200"}`}
               />
-              {errors.email && <p className="mt-1 text-sm text-red-600 flex items-center gap-1"><XCircle className="w-4 h-4" /> {errors.email}</p>}
+              {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
             </div>
 
+            {/* เบอร์โทร */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 <Phone className="inline w-5 h-5 mr-1 text-orange-600" /> เบอร์โทรศัพท์ <span className="text-red-500">*</span>
@@ -315,9 +338,10 @@ export default function EditProfilePage() {
                 placeholder="0812345678"
                 className={`w-full px-5 py-4 bg-orange-50 border rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300 ${errors.phoneNumber ? "border-red-500" : "border-orange-200"}`}
               />
-              {errors.phoneNumber && <p className="mt-1 text-sm text-red-600 flex items-center gap-1"><XCircle className="w-4 h-4" /> {errors.phoneNumber}</p>}
+              {errors.phoneNumber && <p className="mt-1 text-sm text-red-600">{errors.phoneNumber}</p>}
             </div>
 
+            {/* วันเกิด */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 <Calendar className="inline w-5 h-5 mr-1 text-orange-600" /> วันเกิด <span className="text-red-500">*</span>
@@ -329,9 +353,10 @@ export default function EditProfilePage() {
                 onChange={(e) => setProfile({ ...profile, birthDate: e.target.value })}
                 className={`w-full px-5 py-4 bg-orange-50 border rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300 ${errors.birthDate ? "border-red-500" : "border-orange-200"}`}
               />
-              {errors.birthDate && <p className="mt-1 text-sm text-red-600 flex items-center gap-1"><XCircle className="w-4 h-4" /> {errors.birthDate}</p>}
+              {errors.birthDate && <p className="mt-1 text-sm text-red-600">{errors.birthDate}</p>}
             </div>
 
+            {/* ปุ่ม */}
             <div className="flex gap-4 pt-8">
               <button className="flex-1 py-4 border-2 border-orange-200 text-gray-700 font-bold rounded-2xl hover:bg-orange-50 transition">
                 ยกเลิก
@@ -348,35 +373,6 @@ export default function EditProfilePage() {
           </div>
         </div>
       </div>
-
-      {/* ยืนยันการบันทึก */}
-      {showConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <AlertCircle className="w-10 h-10 text-orange-600" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-800 mb-3">ยืนยันการบันทึกข้อมูล?</h3>
-              <p className="text-gray-600 mb-8">ระบบจะอัปเดตข้อมูลโปรไฟล์ของคุณ</p>
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowConfirm(false)}
-                className="flex-1 py-3 border-2 border-gray-300 text-gray-700 font-bold rounded-2xl hover:bg-gray-50 transition"
-              >
-                ยกเลิก
-              </button>
-              <button
-                onClick={confirmSave}
-                className="flex-1 py-3 bg-orange-500 text-white font-bold rounded-2xl hover:bg-orange-600 shadow-lg transition"
-              >
-                ตกลง บันทึกเลย
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }
