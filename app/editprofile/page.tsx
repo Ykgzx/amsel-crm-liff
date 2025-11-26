@@ -1,3 +1,5 @@
+'use client';
+
 import { useState } from "react";
 import Navbar from "../components/Navbar";
 import { Camera, Mail, Phone, Calendar, User, Save, Gift, Star } from "lucide-react";
