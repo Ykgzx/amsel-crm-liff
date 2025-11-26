@@ -9,12 +9,13 @@ import {
   ChevronDown,
   Loader2,
   Save,
+  AlertCircle,
 } from "lucide-react";
 import liff from "@line/liff";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
 
-const TITLE_OPTIONS = ["นาย", "นาง", "นางสาว"];
+const TITLE_OPTIONS = ["นาย", "นาง", "นางสกุล", "เด็กชาย", "เด็กหญิง", "อื่นๆ"];
 
 interface UserProfile {
   title: string;
@@ -26,10 +27,8 @@ interface UserProfile {
 }
 
 export default function EditProfilePage() {
-  // รูปจาก LINE เท่านั้น (แก้ไม่ได้)
   const [linePictureUrl, setLinePictureUrl] = useState<string | null>(null);
 
-  // ข้อมูลที่ดึงมาจาก backend (ให้แก้ไขได้ทั้งหมด)
   const [profile, setProfile] = useState<UserProfile>({
     title: "นาย",
     firstName: "",
@@ -41,8 +40,9 @@ export default function EditProfilePage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
-  // ดึงรูปโปรไฟล์จาก LINE LIFF
+  // ดึงรูปจาก LINE LIFF
   useEffect(() => {
     const initLiff = async () => {
       try {
@@ -58,7 +58,7 @@ export default function EditProfilePage() {
     initLiff();
   }, []);
 
-  // ดึงข้อมูลโปรไฟล์เดิมจาก backend → แล้วเติมลงฟอร์มให้เลย
+  // ดึงข้อมูลโปรไฟล์จาก backend
   useEffect(() => {
     const fetchProfile = async () => {
       try {
@@ -79,7 +79,7 @@ export default function EditProfilePage() {
           });
         }
       } catch (err) {
-        console.error("ไม่สามารถดึงข้อมูลโปรไฟล์ได้:", err);
+        console.error("Fetch error:", err);
       } finally {
         setLoading(false);
       }
@@ -88,8 +88,11 @@ export default function EditProfilePage() {
     fetchProfile();
   }, []);
 
-  const handleSave = async () => {
+  // บันทึกจริงเมื่อกด "ตกลง" ใน popup
+  const confirmSave = async () => {
     setSaving(true);
+    setShowConfirm(false);
+
     try {
       const res = await fetch(`${BACKEND_URL}/api/users/profile`, {
         method: "PUT",
@@ -101,8 +104,7 @@ export default function EditProfilePage() {
       if (res.ok) {
         alert("บันทึกข้อมูลสำเร็จแล้วค่ะ");
       } else {
-        const errorText = await res.text();
-        alert("บันทึกไม่สำเร็จ: " + errorText);
+        alert("เกิดข้อผิดพลาด กรุณาลองใหม่");
       }
     } catch (err) {
       alert("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้");
@@ -135,7 +137,6 @@ export default function EditProfilePage() {
               <h1 className="text-2xl font-bold text-white">แก้ไขโปรไฟล์</h1>
             </div>
 
-            {/* รูปโปรไฟล์จาก LINE (แก้ไม่ได้) */}
             <div className="w-32 h-32 bg-orange-100 rounded-full border-4 border-white shadow-xl overflow-hidden mx-auto">
               {linePictureUrl ? (
                 <img src={linePictureUrl} alt="Profile" className="w-full h-full object-cover" />
@@ -148,15 +149,15 @@ export default function EditProfilePage() {
               )}
             </div>
 
-            {/* ชื่อเต็มที่แก้ไขได้ */}
             <h2 className="mt-6 text-2xl font-bold text-gray-800">
               {profile.title} {profile.firstName} {profile.lastName || "(ยังไม่ได้กรอก)"}
             </h2>
           </div>
 
-          {/* ฟอร์ม — แสดงข้อมูลเดิมทั้งหมดให้แก้ไขได้ */}
+          {/* ฟอร์ม */}
           <div className="bg-white rounded-3xl border-2 border-orange-100 shadow-xl p-6 space-y-5">
 
+            {/* คำนำหน้าชื่อ */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 คำนำหน้าชื่อ
@@ -181,7 +182,6 @@ export default function EditProfilePage() {
                 type="text"
                 value={profile.firstName}
                 onChange={(e) => setProfile({ ...profile, firstName: e.target.value })}
-                placeholder="ชื่อจริง"
                 className="w-full px-5 py-4 bg-orange-50 border border-orange-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300"
               />
             </div>
@@ -192,7 +192,6 @@ export default function EditProfilePage() {
                 type="text"
                 value={profile.lastName}
                 onChange={(e) => setProfile({ ...profile, lastName: e.target.value })}
-                placeholder="นามสกุล"
                 className="w-full px-5 py-4 bg-orange-50 border border-orange-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300"
               />
             </div>
@@ -235,13 +234,12 @@ export default function EditProfilePage() {
               />
             </div>
 
-            {/* ปุ่ม */}
             <div className="flex gap-4 pt-8">
               <button className="flex-1 py-4 border-2 border-orange-200 text-gray-700 font-bold rounded-2xl hover:bg-orange-50 transition">
                 ยกเลิก
               </button>
               <button
-                onClick={handleSave}
+                onClick={() => setShowConfirm(true)}
                 disabled={saving}
                 className="flex-1 py-4 bg-orange-500 text-white font-bold rounded-2xl hover:bg-orange-600 shadow-lg flex items-center justify-center gap-2 transition transform hover:scale-105 disabled:opacity-70"
               >
@@ -250,9 +248,42 @@ export default function EditProfilePage() {
               </button>
             </div>
           </div>
-
         </div>
       </div>
+
+      {/* Popup ยืนยัน */}
+      {showConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="w-10 h-10 text-orange-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-800 mb-3">
+                ยืนยันการบันทึกข้อมูล?
+              </h3>
+              <p className="text-gray-600 mb-8">
+                ระบบจะอัปเดตข้อมูลโปรไฟล์ของคุณ
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowConfirm(false)}
+                className="flex-1 py-3 border-2 border-gray-300 text-gray-700 font-bold rounded-2xl hover:bg-gray-50 transition"
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={confirmSave}
+                className="flex-1 py-3 bg-orange-500 text-white font-bold rounded-2xl hover:bg-orange-600 shadow-lg transition"
+              >
+                ตกลง บันทึกเลย
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
