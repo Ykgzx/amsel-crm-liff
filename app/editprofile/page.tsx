@@ -15,7 +15,6 @@ import {
 import liff from "@line/liff";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
-
 const TITLE_OPTIONS = ["นาย", "นาง", "นางสาว"];
 
 interface UserProfile {
@@ -37,7 +36,6 @@ interface Errors {
 
 export default function EditProfilePage() {
   const [linePictureUrl, setLinePictureUrl] = useState<string | null>(null);
-
   const [profile, setProfile] = useState<UserProfile>({
     title: "นาย",
     firstName: "",
@@ -52,10 +50,9 @@ export default function EditProfilePage() {
   const [saving, setSaving] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  // วันปัจจุบันในรูปแบบ YYYY-MM-DD
   const today = new Date().toISOString().split("T")[0];
 
-  // ดึงรูปจาก LINE
+  // ดึงรูปโปรไฟล์จาก LINE
   useEffect(() => {
     const initLiff = async () => {
       try {
@@ -65,44 +62,53 @@ export default function EditProfilePage() {
           setLinePictureUrl(lineProfile.pictureUrl || null);
         }
       } catch (err) {
-        console.error("LIFF Error:", err);
+        console.error("LIFF Init Error:", err);
       }
     };
     initLiff();
   }, []);
 
-  // ดึงข้อมูลโปรไฟล์เดิม
+  // ดึงข้อมูลโปรไฟล์จาก backend
   useEffect(() => {
     const fetchProfile = async () => {
-         await liff.ready;
-            const accessToken = liff.getAccessToken();
-            if (!accessToken) {
-              console.warn('ไม่มี Access Token (อยู่นอก LINE หรือยังไม่ ready)');
-              return;
-            }
+      await liff.ready;
+      const accessToken = liff.getAccessToken();
+
+      if (!accessToken) {
+        console.warn("ไม่มี Access Token");
+        setLoading(false);
+        return;
+      }
+
       try {
         const res = await fetch(`${BACKEND_URL}/api/users/profile`, {
           method: "GET",
-           headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
-        },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
           credentials: "include",
         });
 
         if (res.ok) {
           const data = await res.json();
+          console.log("ข้อมูลจาก backend:", data);
+
           setProfile({
             title: data.title || "นาย",
             firstName: data.firstName || "",
             lastName: data.lastName || "",
             email: data.email || "",
-            phoneNumber: data.phone || "",
-            birthDate: data.birthdate || "",
+            // รองรับทั้ง phone และ phoneNumber (กรณี backend ส่งไม่ตรงกัน)
+            phoneNumber: data.phone || data.phoneNumber || "",
+            // รองรับทั้ง birthdate และ birthDate
+            birthDate: data.birthdate || data.birthDate || "",
           });
+        } else {
+          console.error("ดึงข้อมูลไม่สำเร็จ", res.status);
         }
       } catch (err) {
-        console.error("Fetch error:", err);
+        console.error("Fetch profile error:", err);
       } finally {
         setLoading(false);
       }
@@ -111,17 +117,12 @@ export default function EditProfilePage() {
     fetchProfile();
   }, []);
 
-  // ฟังก์ชัน validate
+  // ตรวจสอบฟอร์ม
   const validateForm = (): boolean => {
     const newErrors: Errors = {};
 
-    if (!profile.firstName.trim()) {
-      newErrors.firstName = "กรุณากรอกชื่อจริง";
-    }
-
-    if (!profile.lastName.trim()) {
-      newErrors.lastName = "กรุณากรอกนามสกุล";
-    }
+    if (!profile.firstName.trim()) newErrors.firstName = "กรุณากรอกชื่อจริง";
+    if (!profile.lastName.trim()) newErrors.lastName = "กรุณากรอกนามสกุล";
 
     if (!profile.email.trim()) {
       newErrors.email = "กรุณากรอกอีเมล";
@@ -129,11 +130,11 @@ export default function EditProfilePage() {
       newErrors.email = "รูปแบบอีเมลไม่ถูกต้อง";
     }
 
-    const cleanPhone = profile.phoneNumber.replace(/\D/g, ""); // ลบทุกอย่างที่ไม่ใช่ตัวเลข
+    const cleanPhone = profile.phoneNumber.replace(/\D/g, "");
     if (!cleanPhone) {
       newErrors.phoneNumber = "กรุณากรอกเบอร์โทรศัพท์";
     } else if (cleanPhone.length !== 10 || !/^0[6-9]/.test(cleanPhone)) {
-      newErrors.phoneNumber = "เบอร์โทรศัพท์ต้องเป็น 10 หลัก เริ่มต้นด้วย 06-09";
+      newErrors.phoneNumber = "เบอร์โทรต้องเป็น 10 หลัก เริ่มต้นด้วย 06-09";
     }
 
     if (!profile.birthDate) {
@@ -152,36 +153,50 @@ export default function EditProfilePage() {
     }
   };
 
+  // บันทึกข้อมูล – สำคัญมาก: ใช้ชื่อ field ที่ backend ต้องการจริง ๆ
   const confirmSave = async () => {
     setSaving(true);
     setShowConfirm(false);
-     await liff.ready;
-        const accessToken = liff.getAccessToken();
-        if (!accessToken) {
-          console.warn('ไม่มี Access Token (อยู่นอก LINE หรือยังไม่ ready)');
-          return;
-        }
+
+    await liff.ready;
+    const accessToken = liff.getAccessToken();
+    if (!accessToken) {
+      alert("ไม่พบ Access Token กรุณาลองใหม่");
+      setSaving(false);
+      return;
+    }
 
     try {
+      const payload = {
+        title: profile.title,
+        firstName: profile.firstName.trim(),
+        lastName: profile.lastName.trim(),
+        email: profile.email.trim(),
+        phone: profile.phoneNumber.replace(/\D/g, ""),     // backend ต้องการ "phone"
+        birthdate: profile.birthDate,                      // backend ต้องการ "birthdate" (ไม่มี D ตัวใหญ่)
+      };
+
+      console.log("ส่งข้อมูลไป backend:", payload);
+
       const res = await fetch(`${BACKEND_URL}/api/users/profile`, {
         method: "PUT",
         credentials: "include",
-         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
         },
-        body: JSON.stringify({
-          ...profile,
-          phone: profile.phoneNumber.replace(/\D/g, ""), // ส่งเฉพาะตัวเลขไป backend
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
         alert("บันทึกข้อมูลสำเร็จแล้วค่ะ");
       } else {
-        alert("เกิดข้อผิดพลาด กรุณาลองใหม่");
+        const errorText = await res.text();
+        console.error("บันทึกไม่สำเร็จ:", res.status, errorText);
+        alert("เกิดข้อผิดพลาด: " + (errorText || "กรุณาลองใหม่"));
       }
     } catch (err) {
+      console.error("Network error:", err);
       alert("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้");
     } finally {
       setSaving(false);
@@ -234,9 +249,7 @@ export default function EditProfilePage() {
 
             {/* คำนำหน้าชื่อ */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                คำนำหน้าชื่อ
-              </label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">คำนำหน้าชื่อ</label>
               <div className="relative">
                 <select
                   value={profile.title}
@@ -251,7 +264,7 @@ export default function EditProfilePage() {
               </div>
             </div>
 
-            {/* ชื่อ */}
+            {/* ชื่อจริง */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">ชื่อ <span className="text-red-500">*</span></label>
               <input
@@ -260,11 +273,7 @@ export default function EditProfilePage() {
                 onChange={(e) => setProfile({ ...profile, firstName: e.target.value })}
                 className={`w-full px-5 py-4 bg-orange-50 border rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300 ${errors.firstName ? "border-red-500" : "border-orange-200"}`}
               />
-              {errors.firstName && (
-                <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
-                  <XCircle className="w-4 h-4" /> {errors.firstName}
-                </p>
-              )}
+              {errors.firstName && <p className="mt-1 text-sm text-red-600 flex items-center gap-1"><XCircle className="w-4 h-4" /> {errors.firstName}</p>}
             </div>
 
             {/* นามสกุล */}
@@ -276,11 +285,7 @@ export default function EditProfilePage() {
                 onChange={(e) => setProfile({ ...profile, lastName: e.target.value })}
                 className={`w-full px-5 py-4 bg-orange-50 border rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300 ${errors.lastName ? "border-red-500" : "border-orange-200"}`}
               />
-              {errors.lastName && (
-                <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
-                  <XCircle className="w-4 h-4" /> {errors.lastName}
-                </p>
-              )}
+              {errors.lastName && <p className="mt-1 text-sm text-red-600 flex items-center gap-1"><XCircle className="w-4 h-4" /> {errors.lastName}</p>}
             </div>
 
             {/* อีเมล */}
@@ -295,14 +300,10 @@ export default function EditProfilePage() {
                 placeholder="you@example.com"
                 className={`w-full px-5 py-4 bg-orange-50 border rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300 ${errors.email ? "border-red-500" : "border-orange-200"}`}
               />
-              {errors.email && (
-                <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
-                  <XCircle className="w-4 h-4" /> {errors.email}
-                </p>
-              )}
+              {errors.email && <p className="mt-1 text-sm text-red-600 flex items-center gap-1"><XCircle className="w-4 h-4" /> {errors.email}</p>}
             </div>
 
-            {/* เบอร์โทรศัพท์ - จำกัด 10 หลัก */}
+            {/* เบอร์โทร */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 <Phone className="inline w-5 h-5 mr-1 text-orange-600" /> เบอร์โทรศัพท์ <span className="text-red-500">*</span>
@@ -313,38 +314,28 @@ export default function EditProfilePage() {
                 maxLength={10}
                 value={profile.phoneNumber}
                 onChange={(e) => {
-                  const value = e.target.value.replace(/\D/g, ""); // รับเฉพาะตัวเลข
-                  if (value.length <= 10) {
-                    setProfile({ ...profile, phoneNumber: value });
-                  }
+                  const value = e.target.value.replace(/\D/g, "");
+                  if (value.length <= 10) setProfile({ ...profile, phoneNumber: value });
                 }}
                 placeholder="0812345678"
                 className={`w-full px-5 py-4 bg-orange-50 border rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300 ${errors.phoneNumber ? "border-red-500" : "border-orange-200"}`}
               />
-              {errors.phoneNumber && (
-                <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
-                  <XCircle className="w-4 h-4" /> {errors.phoneNumber}
-                </p>
-              )}
+              {errors.phoneNumber && <p className="mt-1 text-sm text-red-600 flex items-center gap-1"><XCircle className="w-4 h-4" /> {errors.phoneNumber}</p>}
             </div>
 
-            {/* วันเกิด - ห้ามเลือกเกินวันนี้ */}
+            {/* วันเกิด */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 <Calendar className="inline w-5 h-5 mr-1 text-orange-600" /> วันเกิด <span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
-                max={today} // สำคัญ: ปิดกั้นไม่ให้เลือกวันเกินวันนี้
+                max={today}
                 value={profile.birthDate}
                 onChange={(e) => setProfile({ ...profile, birthDate: e.target.value })}
                 className={`w-full px-5 py-4 bg-orange-50 border rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300 ${errors.birthDate ? "border-red-500" : "border-orange-200"}`}
               />
-              {errors.birthDate && (
-                <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
-                  <XCircle className="w-4 h-4" /> {errors.birthDate}
-                </p>
-              )}
+              {errors.birthDate && <p className="mt-1 text-sm text-red-600 flex items-center gap-1"><XCircle className="w-4 h-4" /> {errors.birthDate}</p>}
             </div>
 
             {/* ปุ่ม */}
@@ -373,14 +364,9 @@ export default function EditProfilePage() {
               <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <AlertCircle className="w-10 h-10 text-orange-600" />
               </div>
-              <h3 className="text-xl font-bold text-gray-800 mb-3">
-                ยืนยันการบันทึกข้อมูล?
-              </h3>
-              <p className="text-gray-600 mb-8">
-                ระบบจะอัปเดตข้อมูลโปรไฟล์ของคุณ
-              </p>
+              <h3 className="text-xl font-bold text-gray-800 mb-3">ยืนยันการบันทึกข้อมูล?</h3>
+              <p className="text-gray-600 mb-8">ระบบจะอัปเดตข้อมูลโปรไฟล์ของคุณ</p>
             </div>
-
             <div className="flex gap-3">
               <button
                 onClick={() => setShowConfirm(false)}
