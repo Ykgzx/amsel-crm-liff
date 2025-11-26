@@ -52,6 +52,9 @@ export default function EditProfilePage() {
   const [saving, setSaving] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
+  // วันปัจจุบันในรูปแบบ YYYY-MM-DD
+  const today = new Date().toISOString().split("T")[0];
+
   // ดึงรูปจาก LINE
   useEffect(() => {
     const initLiff = async () => {
@@ -98,7 +101,7 @@ export default function EditProfilePage() {
     fetchProfile();
   }, []);
 
-  // ฟังก์ชันตรวจสอบข้อมูล
+  // ฟังก์ชัน validate
   const validateForm = (): boolean => {
     const newErrors: Errors = {};
 
@@ -116,28 +119,29 @@ export default function EditProfilePage() {
       newErrors.email = "รูปแบบอีเมลไม่ถูกต้อง";
     }
 
-    if (!profile.phone.trim()) {
+    const cleanPhone = profile.phone.replace(/\D/g, ""); // ลบทุกอย่างที่ไม่ใช่ตัวเลข
+    if (!cleanPhone) {
       newErrors.phone = "กรุณากรอกเบอร์โทรศัพท์";
-    } else if (!/^0[6-9]\d{8}$/.test(profile.phone.replace(/[-\s]/g, ""))) {
+    } else if (cleanPhone.length !== 10 || !/^0[6-9]/.test(cleanPhone)) {
       newErrors.phone = "เบอร์โทรศัพท์ต้องเป็น 10 หลัก เริ่มต้นด้วย 06-09";
     }
 
     if (!profile.birthdate) {
       newErrors.birthdate = "กรุณาเลือกวันเกิด";
+    } else if (profile.birthdate > today) {
+      newErrors.birthdate = "วันเกิดต้องไม่เกินวันปัจจุบัน";
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // เมื่อกดบันทึก → ตรวจสอบก่อน
   const handleSaveClick = () => {
     if (validateForm()) {
       setShowConfirm(true);
     }
   };
 
-  // บันทึกจริงเมื่อกด "ตกลง"
   const confirmSave = async () => {
     setSaving(true);
     setShowConfirm(false);
@@ -147,7 +151,10 @@ export default function EditProfilePage() {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(profile),
+        body: JSON.stringify({
+          ...profile,
+          phone: profile.phone.replace(/\D/g, ""), // ส่งเฉพาะตัวเลขไป backend
+        }),
       });
 
       if (res.ok) {
@@ -276,15 +283,22 @@ export default function EditProfilePage() {
               )}
             </div>
 
-            {/* เบอร์โทร */}
+            {/* เบอร์โทรศัพท์ - จำกัด 10 หลัก */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 <Phone className="inline w-5 h-5 mr-1 text-orange-600" /> เบอร์โทรศัพท์ <span className="text-red-500">*</span>
               </label>
               <input
-                type="tel"
+                type="text"
+                inputMode="numeric"
+                maxLength={10}
                 value={profile.phone}
-                onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, ""); // รับเฉพาะตัวเลข
+                  if (value.length <= 10) {
+                    setProfile({ ...profile, phone: value });
+                  }
+                }}
                 placeholder="0812345678"
                 className={`w-full px-5 py-4 bg-orange-50 border rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300 ${errors.phone ? "border-red-500" : "border-orange-200"}`}
               />
@@ -295,13 +309,14 @@ export default function EditProfilePage() {
               )}
             </div>
 
-            {/* วันเกิด */}
+            {/* วันเกิด - ห้ามเลือกเกินวันนี้ */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 <Calendar className="inline w-5 h-5 mr-1 text-orange-600" /> วันเกิด <span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
+                max={today} // สำคัญ: ปิดกั้นไม่ให้เลือกวันเกินวันนี้
                 value={profile.birthdate}
                 onChange={(e) => setProfile({ ...profile, birthdate: e.target.value })}
                 className={`w-full px-5 py-4 bg-orange-50 border rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300 ${errors.birthdate ? "border-red-500" : "border-orange-200"}`}
