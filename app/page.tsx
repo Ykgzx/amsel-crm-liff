@@ -1,7 +1,7 @@
 // app/page.tsx
 'use client';
 
-import { useRef, useState, useEffect, useSyncExternalStore } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import liff from '@line/liff';
 import Link from 'next/link';
 import Navbar from './components/Navbar';
@@ -22,32 +22,7 @@ interface UserFullProfile {
   birthDate?: string | null;
 }
 
-interface CachedHomeData {
-  liffProfile: LiffProfile;
-  userProfile: UserFullProfile;
-  cachedAt: number;
-}
-
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.amsel-crm.com';
-
-// Custom hook สำหรับอ่าน cache จาก localStorage (รองรับหลาย tab)
-function useHomeCache() {
-  return useSyncExternalStore(
-    (callback) => {
-      window.addEventListener('storage', callback);
-      return () => window.removeEventListener('storage', callback);
-    },
-    () => {
-      try {
-        const data = localStorage.getItem('amsel_home_cache_v2');
-        return data ? JSON.parse(data) : null;
-      } catch {
-        return null;
-      }
-    },
-    () => null
-  );
-}
 
 export default function Home() {
   const carouselRef = useRef<HTMLDivElement>(null);
@@ -110,33 +85,10 @@ export default function Home() {
     return date.toLocaleDateString('th-TH', options);
   };
 
-  // ดึง cache ครั้งแรก
-  const cachedData = useHomeCache() as CachedHomeData | null;
-
-  // ถ้ามี cache → ใช้ทันที (โหลดหน้าเร็วสุด)
-  useEffect(() => {
-    if (cachedData && !liffProfile && !userProfile) {
-      setLiffProfile(cachedData.liffProfile);
-      setUserProfile(cachedData.userProfile);
-      setIsLiffReady(true);
-      setLoading(false);
-    }
-  }, [cachedData, liffProfile, userProfile]);
-
-  const saveToCache = (liffData: LiffProfile, userData: UserFullProfile) => {
-    const cacheData: CachedHomeData = {
-      liffProfile: liffData,
-      userProfile: userData,
-      cachedAt: Date.now(),
-    };
-    localStorage.setItem('amsel_home_cache_v2', JSON.stringify(cacheData));
-  };
-
   const fetchUserFullProfile = async (lineUserId: string) => {
-    if (!liffProfile) return;
-
     try {
       const accessToken = liff.getAccessToken();
+      console.log(accessToken)
       const response = await fetch(`${BACKEND_URL}/api/users/profile`, {
         method: 'GET',
         headers: {
@@ -150,7 +102,7 @@ export default function Home() {
 
       const data: UserFullProfile = await response.json();
 
-      const profileData = {
+      setUserProfile({
         points: data.points || 0,
         title: data.title,
         firstName: data.firstName,
@@ -158,92 +110,53 @@ export default function Home() {
         email: data.email,
         phoneNumber: data.phoneNumber,
         birthDate: data.birthDate,
-      };
-
-      setUserProfile(profileData);
-      saveToCache(liffProfile, profileData);
+      });
 
     } catch (err) {
       console.warn('ใช้ข้อมูลสำรอง (Backend ไม่ตอบสนอง)', err);
-      const fallback = {
+      setUserProfile({
         points: 3000,
-        firstName: liffProfile.displayName?.split(' ')[0] || 'สมาชิก',
-        lastName: liffProfile.displayName?.split(' ').slice(1).join(' ') || '',
+        firstName: liffProfile?.displayName?.split(' ')[0] || 'สมาชิก',
+        lastName: liffProfile?.displayName?.split(' ').slice(1).join(' ') || '',
         email: 'example@email.com',
         phoneNumber: '081-234-5678',
         birthDate: '1990-01-01T00:00:00.000Z',
-      };
-      setUserProfile(fallback);
-      saveToCache(liffProfile, fallback);
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const initLiffAndLoad = async () => {
-    try {
-      await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID! });
-
-      if (!liff.isLoggedIn()) {
-        liff.login();
-        return;
-      }
-
-      const profile = await liff.getProfile();
-      setLiffProfile(profile);
-      setIsLiffReady(true);
-
-      // ถ้ายังไม่มี cache หรือ cache เก่าเกิน 10 นาที → โหลดใหม่
-      const now = Date.now();
-      const shouldRefresh = !cachedData || (now - cachedData.cachedAt > 10 * 60 * 1000);
-
-      if (shouldRefresh || !userProfile) {
-        await fetchUserFullProfile(profile.userId);
-      } else {
-        // ใช้ cache เก่า แต่รีเฟรชเบื้องหลัง
-        setUserProfile(cachedData.userProfile);
-        setLoading(false);
-
-        // รีเฟรชเงียบๆ เบื้องหลัง
-        fetchUserFullProfile(profile.userId);
-      }
-
-    } catch (error: any) {
-      setLiffError('กรุณาเปิดผ่านแอป LINE เท่านั้น');
-      setIsLiffReady(true);
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    initLiffAndLoad();
-  }, []);
+    const initLiff = async () => {
+      try {
+        await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID! });
 
-  // รีเฟรชข้อมูลเมื่อกลับมาหน้า (visibility change)
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && liffProfile && !loading) {
-        const cached = localStorage.getItem('amsel_home_cache_v2');
-        if (cached) {
-          const { cachedAt } = JSON.parse(cached);
-          if (Date.now() - cachedAt > 5 * 60 * 1000) { // เกิน 5 นาที
-            fetchUserFullProfile(liffProfile.userId);
-          }
+        if (!liff.isLoggedIn()) {
+          liff.login();
+          return;
         }
+
+        const profile = await liff.getProfile();
+        setLiffProfile(profile);
+        await fetchUserFullProfile(profile.userId);
+        setIsLiffReady(true);
+
+      } catch (error: any) {
+        setLiffError('กรุณาเปิดผ่านแอป LINE เท่านั้น');
+        setIsLiffReady(true);
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [liffProfile, loading]);
+    initLiff();
+  }, []);
 
-  // Scroll to current tier
   useEffect(() => {
     if (isLiffReady && memberCardRef.current && !loading && currentTierIndex >= 0) {
       setTimeout(() => {
         const card = memberCardRef.current?.children[currentTierIndex] as HTMLElement;
         card?.scrollIntoView({ behavior: 'smooth', inline: 'start' });
-      }, 300);
+      }, 500);
     }
   }, [isLiffReady, currentTierIndex, loading]);
 
@@ -265,8 +178,7 @@ export default function Home() {
     ? `${userProfile.title} ${userProfile.firstName} ${userProfile.lastName}`
     : `${userProfile?.firstName || ''} ${userProfile?.lastName || ''}`.trim() || liffProfile?.displayName || 'สมาชิก';
 
-  // Loading ครั้งแรกเท่านั้น (ถ้ามี cache จะข้ามทันที)
-  if (loading && !cachedData) {
+  if (!isLiffReady || loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
@@ -343,6 +255,7 @@ export default function Home() {
                       <p className="text-xl font-bold text-orange-600">{fullName}</p>
                     </div>
 
+                    {/* ปุ่มดูข้อมูลส่วนตัว */}
                     <div className="mb-4">
                       <button
                         onClick={() => toggleDetails(tier.name)}
@@ -355,6 +268,7 @@ export default function Home() {
                       </button>
                     </div>
 
+                    {/* ข้อมูลส่วนตัว (แสดง/ซ่อน) */}
                     <div className={`overflow-hidden transition-all duration-500 ${isExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
                       <div className="space-y-4 py-4 text-sm border-t border-gray-200 mt-2">
                         <div className="flex justify-between">
@@ -372,6 +286,7 @@ export default function Home() {
                       </div>
                     </div>
 
+                    {/* คะแนนสะสม */}
                     <div className="text-center mb-6">
                       <p className="text-lg text-gray-700">คะแนนสะสม</p>
                       <p className="text-3xl font-bold text-orange-600">
@@ -379,6 +294,7 @@ export default function Home() {
                       </p>
                     </div>
 
+                    {/* Progress Bar */}
                     <div className="w-full bg-gray-200 rounded-full h-5 mb-5 overflow-hidden">
                       <div
                         className={`h-full rounded-full transition-all duration-1000 ${tier.color}`}
@@ -395,18 +311,50 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Quick Actions & Products */}
+          {/* Quick Actions & Products เหมือนเดิม */}
           <div className="grid grid-cols-2 gap-6 mb-10">
             {[
-              { icon: 'fa-ticket-alt', label: 'คูปองของฉัน', href: '/coupons' },
-              { icon: 'fa-clipboard-list', label: 'ประวัติการสั่งซื้อ', href: '/orders' },
-              { icon: 'fa-map-marker-alt', label: 'ที่อยู่', href: '/addresses' },
-              { icon: 'fa-comment-dots', label: 'รีวิว', href: '/reviews' },
-              { icon: 'fa-receipt', label: 'อัปโหลดใบเสร็จ', href: '/receiptupload' },
-              { icon: 'fa-question-circle', label: 'ช่วยเหลือ', href: '/help' },
-              { icon: 'fa-exchange', label: 'แลกของรางวัล', href: '/rewardstore' },
+              { 
+                icon: 'fa-ticket-alt', 
+                label: 'คูปองของฉัน', 
+                href: '/coupons' 
+              },
+              { 
+                icon: 'fa-clipboard-list', 
+                label: 'ประวัติการสั่งซื้อ', 
+                href: '/orders' 
+              },
+              { 
+                icon: 'fa-map-marker-alt', 
+                label: 'ที่อยู่', 
+                href: '/addresses' 
+              },
+              { 
+                icon: 'fa-comment-dots', 
+                label: 'รีวิว', 
+                href: '/reviews' 
+              },
+              { 
+                icon: 'fa-receipt',
+                label: 'อัปโหลดใบเสร็จ', 
+                href: '/receiptupload' 
+              },
+              { 
+                icon: 'fa-question-circle',
+                label: 'ช่วยเหลือ', 
+                href: '/help' 
+              },
+              { 
+                icon: 'fa-exchange',
+                label: 'แลกของรางวัล', 
+                href: '/rewardstore' 
+              },
             ].map((item) => (
-              <Link key={item.href} href={item.href} className="flex flex-col items-center group transition-all duration-200">
+              <Link 
+                key={item.href} 
+                href={item.href}
+                className="flex flex-col items-center group transition-all duration-200"
+              >
                 <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center border-2 border-orange-200 mb-2 
                                 group-hover:bg-orange-200 group-hover:border-orange-400 group-hover:scale-110 
                                 transition-all duration-300 shadow-md">
