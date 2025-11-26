@@ -74,9 +74,19 @@ export default function EditProfilePage() {
   // ดึงข้อมูลโปรไฟล์เดิม
   useEffect(() => {
     const fetchProfile = async () => {
+         await liff.ready;
+            const accessToken = liff.getAccessToken();
+            if (!accessToken) {
+              console.warn('ไม่มี Access Token (อยู่นอก LINE หรือยังไม่ ready)');
+              return;
+            }
       try {
         const res = await fetch(`${BACKEND_URL}/api/users/profile`, {
           method: "GET",
+           headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
           credentials: "include",
         });
 
@@ -145,12 +155,21 @@ export default function EditProfilePage() {
   const confirmSave = async () => {
     setSaving(true);
     setShowConfirm(false);
+     await liff.ready;
+        const accessToken = liff.getAccessToken();
+        if (!accessToken) {
+          console.warn('ไม่มี Access Token (อยู่นอก LINE หรือยังไม่ ready)');
+          return;
+        }
 
     try {
       const res = await fetch(`${BACKEND_URL}/api/users/profile`, {
         method: "PUT",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+         headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
         body: JSON.stringify({
           ...profile,
           phone: profile.phone.replace(/\D/g, ""), // ส่งเฉพาะตัวเลขไป backend
