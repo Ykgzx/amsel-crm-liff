@@ -200,7 +200,7 @@ export default function EditProfilePage() {
         lastName: profile.lastName.trim(),
         email: profile.email.trim(),
         phoneNumber: profile.phoneNumber.replace(/\D/g, ""),
-        birthDate: profile.birthDate ? `${profile.birthDate}T00:00:00.000Z` : null,
+        birthDate: profile.birthDate ? profile.birthDate : null,
       };
 
       const res = await fetch(`${BACKEND_URL}/api/users/profile`, {
