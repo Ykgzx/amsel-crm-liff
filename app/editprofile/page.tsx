@@ -383,9 +383,9 @@ export default function EditProfilePage() {
               {errors.birthDate && <p className="mt-1 text-sm text-red-600 flex items-center gap-1"><XCircle className="w-4 h-4" /> {errors.birthDate}</p>}
             </div>
 
-            <div className="flex gap-4 pt-8">
+            <div className="flex justify-center items-center gap-4 pt-8">
                 <Link href="/" className="flex-1">
-                    <button className="w-full py-4 border-2 border-orange-200 text-gray-700 font-bold rounded-2xl hover:bg-orange-50 transition">
+                    <button className="flex-1 py-4 border-2 border-orange-200 text-gray-700 font-bold rounded-2xl hover:bg-orange-50 transition">
                         ยกเลิก
                     </button>
                 </Link>
