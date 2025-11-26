@@ -13,9 +13,9 @@ import {
 } from "lucide-react";
 import liff from "@line/liff";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
-const TITLE_OPTIONS = ["นาย", "นาง", "นางสกุล", "เด็กชาย", "เด็กหญิง", "อื่นๆ"];
+const TITLE_OPTIONS = ["นาย", "นาง", "นางสาว"];
 
 interface UserProfile {
   title: string;
