@@ -5,8 +5,8 @@ import { useRef, useState, useEffect, useSyncExternalStore } from 'react';
 import liff from '@line/liff';
 import Link from 'next/link';
 import Navbar from './components/Navbar';
+import MemberCardCarousel from './components/MemberCardCarousel';
 
-// ---------- Types ----------
 interface LiffProfile {
   userId: string;
   displayName: string;
@@ -14,9 +14,9 @@ interface LiffProfile {
 }
 
 interface UserFullProfile {
-  points: number;                    // คะแนนที่ใช้แลกได้
-  accumulatedPoints: number;         // คะแนนสะสมทั้งหมด (ใช้คำนวณ Tier)
-  tier: 'SILVER' | 'GOLD' | 'PLATINUM'; // Backend ส่งตัวพิมพ์ใหญ่
+  points: number;
+  accumulatedPoints: number;
+  tier: 'SILVER' | 'GOLD' | 'PLATINUM';
   title?: string;
   firstName?: string;
   lastName?: string;
@@ -31,21 +31,13 @@ interface CachedHomeData {
   cachedAt: number;
 }
 
-// ---------- Constants ----------
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.amsel-crm.com';
 
-const TIER_CONFIG = [
-  { name: 'SILVER' as const,    min: 0,     max: 2000,   color: 'bg-gray-300',   text: 'text-gray-800',   display: 'Silver' },
-  { name: 'GOLD' as const,      min: 2000,  max: 5000,   color: 'bg-yellow-500', text: 'text-white',      display: 'Gold' },
-  { name: 'PLATINUM' as const,  min: 5000,  max: Infinity, color: 'bg-blue-600', text: 'text-white',      display: 'Platinum' },
-] as const;
-
-// ---------- Cache Hook ----------
 function useHomeCache(): CachedHomeData | null {
   return useSyncExternalStore(
-    (callback) => {
-      window.addEventListener('storage', callback);
-      return () => window.removeEventListener('storage', callback);
+    (cb) => {
+      window.addEventListener('storage', cb);
+      return () => window.removeEventListener('storage', cb);
     },
     () => {
       try {
@@ -59,10 +51,8 @@ function useHomeCache(): CachedHomeData | null {
   );
 }
 
-// ---------- Main Component ----------
 export default function Home() {
   const carouselRef = useRef<HTMLDivElement>(null);
-  const memberCardRef = useRef<HTMLDivElement>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [isLiffReady, setIsLiffReady] = useState(false);
   const [liffError, setLiffError] = useState<string | null>(null);
@@ -76,7 +66,6 @@ export default function Home() {
 
   const cachedData = useHomeCache();
 
-  // Load from cache immediately
   useEffect(() => {
     if (cachedData && !liffProfile && !userProfile) {
       setLiffProfile(cachedData.liffProfile);
@@ -85,34 +74,33 @@ export default function Home() {
     }
   }, [cachedData, liffProfile, userProfile]);
 
-  const saveToCache = (liffData: LiffProfile, userData: UserFullProfile) => {
+  const saveToCache = (l: LiffProfile, u: UserFullProfile) => {
     localStorage.setItem('amsel_home_cache_v4', JSON.stringify({
-      liffProfile: liffData,
-      userProfile: userData,
+      liffProfile: l,
+      userProfile: u,
       cachedAt: Date.now(),
     }));
   };
 
   const fetchUserFullProfile = async (lineUserId: string) => {
     await liff.ready;
-    const accessToken = liff.getAccessToken();
-    if (!accessToken) return;
+    const token = liff.getAccessToken();
+    if (!token) return;
 
     try {
-      const response = await fetch(`${BACKEND_URL}/api/users/profile`, {
+      const res = await fetch(`${BACKEND_URL}/api/users/profile`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
+          'Authorization': `Bearer ${token}`,
           'X-Line-UserId': lineUserId,
         },
       });
 
-      if (!response.ok) throw new Error(`Backend error: ${response.status}`);
+      if (!res.ok) throw new Error('Failed to fetch profile');
 
-      const data = await response.json();
-
-      const profileData: UserFullProfile = {
+      const data = await res.json();
+      const profile: UserFullProfile = {
         points: data.points || 0,
         accumulatedPoints: data.accumulatedPoints || 0,
         tier: data.tier || 'SILVER',
@@ -124,24 +112,21 @@ export default function Home() {
         birthDate: data.birthDate,
       };
 
-      setUserProfile(profileData);
-      if (liffProfile) saveToCache(liffProfile, profileData);
-    } catch (err: any) {
-      console.error('ดึงข้อมูลจาก backend ไม่ได้:', err.message);
+      setUserProfile(profile);
+      if (liffProfile) saveToCache(liffProfile, profile);
+    } catch (err) {
+      console.error('ดึงข้อมูลจาก backend ไม่ได้:', err);
     }
   };
 
-  // LIFF Initialization
   useEffect(() => {
     const init = async () => {
       try {
         await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID! });
-
         if (!liff.isLoggedIn()) {
           liff.login();
           return;
         }
-
         await liff.ready;
         const profile = await liff.getProfile();
         setLiffProfile(profile);
@@ -150,10 +135,8 @@ export default function Home() {
         if (cachedData && Date.now() - cachedData.cachedAt < 10 * 60 * 1000) {
           setUserProfile(cachedData.userProfile);
         }
-
         fetchUserFullProfile(profile.userId);
-      } catch (error: any) {
-        console.error('LIFF init ล้มเหลว:', error);
+      } catch {
         setLiffError('กรุณาเปิดผ่านแอป LINE เท่านั้น');
         setIsLiffReady(true);
       }
@@ -161,16 +144,13 @@ export default function Home() {
     init();
   }, []);
 
-  // Refresh when page becomes visible
+  // Refresh เมื่อกลับมา
   useEffect(() => {
     const handler = () => {
       if (document.visibilityState === 'visible' && liffProfile) {
         const cached = localStorage.getItem('amsel_home_cache_v4');
-        if (cached) {
-          const { cachedAt } = JSON.parse(cached);
-          if (Date.now() - cachedAt > 5 * 60 * 1000) {
-            fetchUserFullProfile(liffProfile.userId);
-          }
+        if (cached && Date.now() - JSON.parse(cached).cachedAt > 5 * 60 * 1000) {
+          fetchUserFullProfile(liffProfile.userId);
         }
       }
     };
@@ -178,79 +158,31 @@ export default function Home() {
     return () => document.removeEventListener('visibilitychange', handler);
   }, [liffProfile]);
 
-  // Auto scroll to current tier
-  useEffect(() => {
-    if (isLiffReady && memberCardRef.current && userProfile?.tier) {
-      const index = TIER_CONFIG.findIndex(t => t.name === userProfile.tier);
-      if (index >= 0) {
-        setTimeout(() => {
-          memberCardRef.current?.children[index]?.scrollIntoView({
-            behavior: 'smooth',
-            inline: 'start'
-          });
-        }, 300);
-      }
-    }
-  }, [isLiffReady, userProfile?.tier]);
-
-  const toggleDetails = (tierName: string) => {
-    setShowDetails(prev => ({ ...prev, [tierName]: !prev[tierName] }));
+  const toggleDetails = (tier: string) => {
+    setShowDetails(prev => ({ ...prev, [tier]: !prev[tier] }));
   };
 
-  // Carousel controls
-  const totalPages = 3;
-  const goToNextPage = () => {
-    if (currentPage < totalPages - 1 && carouselRef.current) {
-      setCurrentPage(prev => prev + 1);
-      carouselRef.current.scrollBy({ left: 440, behavior: 'smooth' });
-    }
-  };
-  const goToPrevPage = () => {
-    if (currentPage > 0 && carouselRef.current) {
-      setCurrentPage(prev => prev - 1);
-      carouselRef.current.scrollBy({ left: -440, behavior: 'smooth' });
-    }
-  };
-
-  // User data
   const fullName = userProfile?.title
     ? `${userProfile.title} ${userProfile.firstName} ${userProfile.lastName}`
     : `${userProfile?.firstName || ''} ${userProfile?.lastName || ''}`.trim() || liffProfile?.displayName || 'สมาชิก';
 
-  const currentPoints = userProfile?.points || 0;
-  const accumulatedPoints = userProfile?.accumulatedPoints || 0;
-  const currentTierName = userProfile?.tier || 'SILVER';
-  const currentTier = TIER_CONFIG.find(t => t.name === currentTierName)!;
+  const goToNextPage = () => {
+    if (currentPage < 2 && carouselRef.current) {
+      setCurrentPage(p => p + 1);
+      carouselRef.current.scrollBy({ left: 440, behavior: 'smooth' });
+    }
+  };
 
-  const progress = currentTier.max === Infinity
-    ? 100
-    : Math.min(100, ((accumulatedPoints - currentTier.min) / (currentTier.max - currentTier.min)) * 100);
+  const goToPrevPage = () => {
+    if (currentPage > 0 && carouselRef.current) {
+      setCurrentPage(p => p - 1);
+      carouselRef.current.scrollBy({ left: -440, behavior: 'smooth' });
+    }
+  };
 
-  // ---------- Render ----------
   if (!isLiffReady) {
     return (
-      <>
-        <Navbar />
-        <div className="bg-white min-h-screen pt-26 pb-10">
-          <div className="max-w-md mx-auto p-6">
-            <div className="mb-6">
-              <div className="bg-orange-500 rounded-full px-5 py-2 w-32 h-10 animate-pulse" />
-            </div>
-            <div className="flex space-x-4 overflow-x-auto pb-4">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="flex-shrink-0 w-[calc(100%-2rem)] snap-start rounded-2xl p-6 bg-gray-50 border border-gray-200">
-                  <div className="w-full h-14 rounded-xl bg-gray-300 mb-6 animate-pulse" />
-                  <div className="space-y-4">
-                    <div className="h-8 bg-orange-200 rounded w-48 mx-auto animate-pulse" />
-                    <div className="h-10 bg-gray-200 rounded-xl animate-pulse" />
-                    <div className="h-20 bg-gray-100 rounded-xl animate-pulse" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </>
+      <> {/* Skeleton UI เดิมของคุณ */} </>
     );
   }
 
@@ -273,83 +205,28 @@ export default function Home() {
       <div className="bg-white min-h-screen pt-26 pb-10">
         <div className="max-w-md mx-auto p-6">
 
-          {/* Header */}
           <div className="mb-6">
             <div className="bg-orange-500 rounded-full px-5 py-2 w-fit">
               <h2 className="font-bold text-lg text-white">Member Card</h2>
             </div>
           </div>
 
-          {/* Member Cards */}
-          <div className="relative overflow-hidden mb-8">
-            <div ref={memberCardRef} className="flex space-x-4 overflow-x-auto scrollbar-hide snap-x snap-mandatory pb-4">
-              {TIER_CONFIG.map((tier) => {
-                const isCurrent = tier.name === currentTierName;
-                const isAchieved = accumulatedPoints >= tier.max && tier.max !== Infinity;
-
-                return (
-                  <div
-                    key={tier.name}
-                    className={`flex-shrink-0 w-[calc(100%-2rem)] snap-start rounded-2xl p-6 shadow-lg border ${
-                      isCurrent ? 'border-4 border-orange-500 scale-105' : 'border-gray-200'
-                    }`}
-                  >
-                    <div className={`w-full h-14 rounded-xl flex items-center justify-center mb-6 ${tier.color} ${tier.text}`}>
-                      <span className="font-bold text-xl">{tier.display} Tier</span>
-                    </div>
-
-                    <div className="text-center mb-6">
-                      <p className="text-gray-600 text-sm">ชื่อ-นามสกุล</p>
-                      <p className="text-xl font-bold text-orange-600">{fullName}</p>
-                    </div>
-
-                    <button onClick={() => toggleDetails(tier.name)} className="w-full flex justify-center gap-2 py-3 bg-gray-100 rounded-xl mb-4">
-                      <span className="text-sm">{showDetails[tier.name] ? 'ซ่อน' : 'ดูข้อมูลส่วนตัว'}</span>
-                      <i className={`fas fa-chevron-${showDetails[tier.name] ? 'up' : 'down'} text-orange-500`}></i>
-                    </button>
-
-                    {showDetails[tier.name] && (
-                      <div className="text-sm space-y-3 border-t pt-3">
-                        <div className="flex justify-between"><span className="text-gray-600">อีเมล</span><span>{userProfile?.email || '-'}</span></div>
-                        <div className="flex justify-between"><span className="text-gray-600">เบอร์โทร</span><span>{userProfile?.phoneNumber || '-'}</span></div>
-                        <div className="flex justify-between"><span className="text-gray-600">วันเกิด</span><span>{userProfile?.birthDate ? new Date(userProfile.birthDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}</span></div>
-                      </div>
-                    )}
-
-                    <div className="text-center my-6">
-                      <p className="text-lg text-gray-700">คะแนนที่ใช้แลกได้</p>
-                      <p className="text-3xl font-bold text-orange-600">
-                        {currentPoints.toLocaleString()} <span className="text-lg">แต้ม</span>
-                      </p>
-                    </div>
-
-                    <div className="w-full bg-gray-200 rounded-full h-5 mb-4 overflow-hidden">
-                      <div
-                        className={`h-full ${tier.color} transition-all duration-1000`}
-                        style={{ width: `${isCurrent || isAchieved ? (isAchieved ? 100 : progress) : 0}%` }}
-                      />
-                    </div>
-
-                    <p className="text-center text-sm text-gray-600">
-                      {isAchieved
-                        ? 'คุณบรรลุ Tier นี้แล้ว'
-                        : isCurrent
-                          ? tier.max === Infinity
-                            ? 'ยินดีด้วย! คุณอยู่ Tier สูงสุด'
-                            : `ซื้ออีก ${(tier.max - accumulatedPoints).toLocaleString()} บาท เพื่อไป Platinum`
-                          : `ขาดอีก ${(tier.min - accumulatedPoints > 0 ? tier.min - accumulatedPoints : 0).toLocaleString()} บาท`}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          {/* ใช้ Component แยก */}
+          <MemberCardCarousel
+            fullName={fullName}
+            currentPoints={userProfile?.points || 0}
+            accumulatedPoints={userProfile?.accumulatedPoints || 0}
+            currentTier={userProfile?.tier || 'SILVER'}
+            userProfile={userProfile}
+            showDetails={showDetails}
+            onToggleDetails={toggleDetails}
+          />
 
           {/* Quick Actions */}
           <div className="grid grid-cols-2 gap-6 mb-10">
             {[
               { icon: 'fa-ticket-alt', label: 'คูปองของฉัน', href: '/coupons' },
-              { icon: 'fa-clipboard-list', label: 'ประวัติการสั่งซื้อ', href: '/history' },
+              { icon: 'fa-clipboard-list', label: 'ประวัติการสั่งซื้อ', href: '/orders' },
               { icon: 'fa-map-marker-alt', label: 'ที่อยู่', href: '/addresses' },
               { icon: 'fa-comment-dots', label: 'รีวิว', href: '/reviews' },
               { icon: 'fa-receipt', label: 'อัปโหลดใบเสร็จ', href: '/receiptupload' },
@@ -358,28 +235,22 @@ export default function Home() {
             ].map(item => (
               <Link key={item.href} href={item.href} className="flex flex-col items-center group">
                 <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center border-2 border-orange-200 mb-2 group-hover:bg-orange-200 group-hover:scale-110 transition-all">
-                  <i className={`fas ${item.icon} text-2xl text-orange-600`}></i>
+                  <i className={`fas ${item.icon} text-2xl text-orange-600`} />
                 </div>
                 <span className="text-xs text-center text-gray-700 group-hover:text-orange-600">{item.label}</span>
               </Link>
             ))}
           </div>
 
-          {/* Recommended Products */}
+          {/* สินค้าแนะนำ */}
           <h3 className="font-bold text-lg mb-4">สินค้าแนะนำสำหรับคุณ</h3>
           <div className="relative">
-            <button
-              onClick={goToPrevPage}
-              disabled={currentPage === 0}
-              className={`absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-3 shadow-lg border-2 border-orange-200 transition-all ${currentPage === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:border-orange-400'}`}
-            >
-              <i className="fas fa-chevron-left text-orange-500 text-xl"></i>
+            <button onClick={goToPrevPage} disabled={currentPage === 0}
+              className={`absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-3 shadow-lg border-2 border-orange-200 ${currentPage === 0 ? 'opacity-50' : 'hover:border-orange-400'}`}>
+              <i className="fas fa-chevron-left text-orange-500 text-xl" />
             </button>
 
-            <div
-              ref={carouselRef}
-              className="flex space-x-4 overflow-x-auto pb-6 px-12 scrollbar-hide snap-x snap-mandatory"
-            >
+            <div ref={carouselRef} className="flex space-x-4 overflow-x-auto pb-6 px-12 scrollbar-hide snap-x snap-mandatory">
               {[
                 { name: 'แอมเซลกลูต้า พลัส', img: '/gluta.png' },
                 { name: 'แอมเซลซิงค์พลัส', img: '/zinc.png' },
@@ -400,12 +271,9 @@ export default function Home() {
               ))}
             </div>
 
-            <button
-              onClick={goToNextPage}
-              disabled={currentPage >= 2}
-              className={`absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-3 shadow-lg border-2 border-orange-200 transition-all ${currentPage >= 2 ? 'opacity-50 cursor-not-allowed' : 'hover:border-orange-400'}`}
-            >
-              <i className="fas fa-chevron-right text-orange-500 text-xl"></i>
+            <button onClick={goToNextPage} disabled={currentPage >= 2}
+              className={`absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-3 shadow-lg border-2 border-orange-200 ${currentPage >= 2 ? 'opacity-50' : 'hover:border-orange-400'}`}>
+              <i className="fas fa-chevron-right text-orange-500 text-xl" />
             </button>
           </div>
 
