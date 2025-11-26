@@ -12,9 +12,9 @@ import {
 } from "lucide-react";
 import liff from "@line/liff";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ;
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
-const TITLE_OPTIONS = ["นาย", "นาง", "นางสาว",];
+const TITLE_OPTIONS = ["นาย", "นาง", "นางสาว"];
 
 interface UserProfile {
   title: string;
@@ -26,10 +26,10 @@ interface UserProfile {
 }
 
 export default function EditProfilePage() {
-  // จาก LINE LIFF (รูปเท่านั้นที่แก้ไม่ได้)
+  // รูปจาก LINE เท่านั้น (แก้ไม่ได้)
   const [linePictureUrl, setLinePictureUrl] = useState<string | null>(null);
 
-  // จาก Backend (แก้ไขได้หมด)
+  // ข้อมูลที่ดึงมาจาก backend (ให้แก้ไขได้ทั้งหมด)
   const [profile, setProfile] = useState<UserProfile>({
     title: "นาย",
     firstName: "",
@@ -42,7 +42,7 @@ export default function EditProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // ดึงรูปจาก LINE LIFF
+  // ดึงรูปโปรไฟล์จาก LINE LIFF
   useEffect(() => {
     const initLiff = async () => {
       try {
@@ -58,7 +58,7 @@ export default function EditProfilePage() {
     initLiff();
   }, []);
 
-  // ดึงข้อมูลส่วนตัวจาก Backend
+  // ดึงข้อมูลโปรไฟล์เดิมจาก backend → แล้วเติมลงฟอร์มให้เลย
   useEffect(() => {
     const fetchProfile = async () => {
       try {
@@ -79,7 +79,7 @@ export default function EditProfilePage() {
           });
         }
       } catch (err) {
-        console.error("Fetch profile error:", err);
+        console.error("ไม่สามารถดึงข้อมูลโปรไฟล์ได้:", err);
       } finally {
         setLoading(false);
       }
@@ -101,7 +101,8 @@ export default function EditProfilePage() {
       if (res.ok) {
         alert("บันทึกข้อมูลสำเร็จแล้วค่ะ");
       } else {
-        alert("เกิดข้อผิดพลาด กรุณาลองใหม่");
+        const errorText = await res.text();
+        alert("บันทึกไม่สำเร็จ: " + errorText);
       }
     } catch (err) {
       alert("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้");
@@ -137,11 +138,7 @@ export default function EditProfilePage() {
             {/* รูปโปรไฟล์จาก LINE (แก้ไม่ได้) */}
             <div className="w-32 h-32 bg-orange-100 rounded-full border-4 border-white shadow-xl overflow-hidden mx-auto">
               {linePictureUrl ? (
-                <img
-                  src={linePictureUrl}
-                  alt="Profile"
-                  className="w-full h-full object-cover"
-                />
+                <img src={linePictureUrl} alt="Profile" className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-orange-50">
                   <span className="text-5xl font-bold text-orange-300">
@@ -151,16 +148,15 @@ export default function EditProfilePage() {
               )}
             </div>
 
-            {/* ชื่อเต็ม (แก้ได้จาก backend) */}
+            {/* ชื่อเต็มที่แก้ไขได้ */}
             <h2 className="mt-6 text-2xl font-bold text-gray-800">
-              {profile.title} {profile.firstName} {profile.lastName}
+              {profile.title} {profile.firstName} {profile.lastName || "(ยังไม่ได้กรอก)"}
             </h2>
           </div>
 
-          {/* ฟอร์มแก้ไข */}
+          {/* ฟอร์ม — แสดงข้อมูลเดิมทั้งหมดให้แก้ไขได้ */}
           <div className="bg-white rounded-3xl border-2 border-orange-100 shadow-xl p-6 space-y-5">
 
-            {/* คำนำหน้าชื่อ */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 คำนำหน้าชื่อ
@@ -185,6 +181,7 @@ export default function EditProfilePage() {
                 type="text"
                 value={profile.firstName}
                 onChange={(e) => setProfile({ ...profile, firstName: e.target.value })}
+                placeholder="ชื่อจริง"
                 className="w-full px-5 py-4 bg-orange-50 border border-orange-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300"
               />
             </div>
@@ -195,6 +192,7 @@ export default function EditProfilePage() {
                 type="text"
                 value={profile.lastName}
                 onChange={(e) => setProfile({ ...profile, lastName: e.target.value })}
+                placeholder="นามสกุล"
                 className="w-full px-5 py-4 bg-orange-50 border border-orange-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300"
               />
             </div>
@@ -207,7 +205,7 @@ export default function EditProfilePage() {
                 type="email"
                 value={profile.email}
                 onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                placeholder="กรอกอีเมล"
+                placeholder="you@example.com"
                 className="w-full px-5 py-4 bg-orange-50 border border-orange-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300"
               />
             </div>
@@ -238,7 +236,7 @@ export default function EditProfilePage() {
             </div>
 
             {/* ปุ่ม */}
-            <div className="flex gap-4 pt-6">
+            <div className="flex gap-4 pt-8">
               <button className="flex-1 py-4 border-2 border-orange-200 text-gray-700 font-bold rounded-2xl hover:bg-orange-50 transition">
                 ยกเลิก
               </button>
