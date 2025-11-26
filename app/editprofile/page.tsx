@@ -13,9 +13,11 @@ import {
 } from "lucide-react";
 import liff from "@line/liff";
 import Swal from "sweetalert2";
+import { useRouter } from 'next/navigation';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 const TITLE_OPTIONS = ["นาย", "นาง", "นางสาว"];
+const router = useRouter();
 
 interface UserProfile {
   title: string;
@@ -383,17 +385,20 @@ export default function EditProfilePage() {
             </div>
 
             <div className="flex gap-4 pt-8">
-              <button className="flex-1 py-4 border-2 border-orange-200 text-gray-700 font-bold rounded-2xl hover:bg-orange-50 transition">
-                ยกเลิก
-              </button>
-              <button
-                onClick={handleSaveClick}
-                disabled={saving}
-                className="flex-1 py-4 bg-orange-500 text-white font-bold rounded-2xl hover:bg-orange-600 shadow-lg flex items-center justify-center gap-2 transition transform hover:scale-105 disabled:opacity-70"
-              >
-                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                {saving ? "กำลังบันทึก..." : "บันทึกการเปลี่ยนแปลง"}
-              </button>
+                <button
+                    onClick={() => router.push('/')}   // หรือ router.back() ถ้าอยากย้อนกลับ
+                    className="flex items-center justify-center gap-2 flex-1 py-4 border-2 border-orange-200 text-gray-700 font-bold rounded-2xl hover:bg-orange-50 transition active:scale-95"
+                    >
+                    ยกเลิก
+                </button>
+                <button
+                    onClick={handleSaveClick}
+                    disabled={saving}
+                    className="flex-1 py-4 bg-orange-500 text-white font-bold rounded-2xl hover:bg-orange-600 shadow-lg flex items-center justify-center gap-2 transition transform hover:scale-105 disabled:opacity-70"
+                >
+                    {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                    {saving ? "กำลังบันทึก..." : "บันทึกการเปลี่ยนแปลง"}
+                </button>
             </div>
           </div>
         </div>
