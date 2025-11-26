@@ -4,6 +4,8 @@
 
 import { useEffect, useState } from 'react';
 import liff from '@line/liff';
+import Link from 'next/link';
+import Image from 'next/image'; // ใช้ Next/Image ดีกว่า <img> ธรรมดา (optional แต่แนะนำ)
 
 export default function Navbar() {
   const [profile, setProfile] = useState<{ pictureUrl?: string } | null>(null);
@@ -13,7 +15,6 @@ export default function Navbar() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        // เรียก liff.init() ได้เลย — ปลอดภัยถ้าเรียกซ้ำ
         await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID! });
 
         if (liff.isLoggedIn()) {
@@ -33,26 +34,34 @@ export default function Navbar() {
 
   return (
     <div className="fixed top-0 left-0 right-0 z-50 h-20 bg-gradient-to-r from-amber-500 via-white to-orange-500 flex items-center justify-center px-6 md:px-14">
-      <img src="/logo-amsel.png" className='w-40' alt="" />
-      <div className="absolute right-6 md:right-14 w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-md">
+      <img src="/logo-amsel.png" alt="Amsel Logo" className="w-40" />
+
+      {/* รูปโปรไฟล์ที่คลิกแล้วไปหน้า Edit Profile */}
+      <Link
+        href="/editprofile"
+        className="absolute right-6 md:right-14 w-12 h-12 rounded-full overflow-hidden border-4 border-white shadow-lg transition-transform hover:scale-110 focus:outline-none ring-4 ring-white/30"
+        aria-label="แก้ไขโปรไฟล์"
+        prefetch={true} // prefetch ทันทีที่โหลด Navbar (เร็วสุด!)
+      >
         {loading ? (
-          // Loading state
-          <div className="w-full h-full bg-white/20 animate-pulse"></div>
-        ) : profile?.pictureUrl ? (
-          // รูปโปรไฟล์จริง
-          <img
+          <div className="w-full h-full bg-white/30 animate-pulse" />
+        ) : profile?.pictureUrl && !error ? (
+          // ใช้ Next/Image จะดีที่สุด (optional)
+          <Image
             src={profile.pictureUrl}
-            alt="Profile"
+            alt="รูปโปรไฟล์"
+            width={48}
+            height={48}
             className="w-full h-full object-cover"
             onError={() => setError(true)}
+            priority
           />
         ) : (
-          // Fallback: ไอคอนผู้ใช้
-          <div className="w-full h-full bg-white/20 flex items-center justify-center">
-            <i className="fas fa-user text-white text-lg"></i>
+          <div className="w-full h-full bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center">
+            <i className="fas fa-user text-white text-2xl" />
           </div>
         )}
-      </div>
+      </Link>
     </div>
   );
 }
