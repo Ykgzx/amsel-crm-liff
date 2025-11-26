@@ -51,18 +51,6 @@ export default function ReviewsPage() {
               <h1 className="text-xl font-bold text-white">รีวิวจากลูกค้า</h1>
             </div>
 
-            {/* พอยต์ของคุณ (เหมือนหน้ารางวัล) */}
-            <div className="inline-flex items-center gap-3 bg-orange-50 border-2 border-orange-200 rounded-2xl px-8 py-4 mb-8">
-              <Gift className="w-8 h-8 text-orange-600" />
-              <div>
-                <p className="text-gray-600 text-sm">พอยต์ของคุณ</p>
-                <p className="text-3xl font-bold text-orange-600">
-                  {currentPoints.toLocaleString()} <span className="text-lg">Pts</span>
-                </p>
-              </div>
-              <Star className="w-8 h-8 text-orange-500 fill-orange-500" />
-            </div>
-
             {/* ปุ่มเขียนรีวิว */}
             <button className="w-full bg-orange-500 text-white py-4 rounded-full font-bold text-lg hover:bg-orange-600 transition-all shadow-md flex items-center justify-center gap-2">
               <Star className="w-6 h-6" />
