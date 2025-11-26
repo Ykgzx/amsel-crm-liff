@@ -82,9 +82,7 @@ export default function Home() {
   };
 
   const fetchUserFullProfile = async (lineUserId: string) => {
-    // สำคัญมาก: รอให้ LIFF พร้อมก่อนดึง accessToken
     await liff.ready;
-
     const accessToken = liff.getAccessToken();
     if (!accessToken) {
       console.warn('ไม่มี Access Token (อยู่นอก LINE หรือยังไม่ ready)');
@@ -123,7 +121,6 @@ export default function Home() {
 
     } catch (err: any) {
       console.error('ดึงข้อมูลจาก backend ไม่ได้:', err.message);
-      // ไม่ต้อง fallback เพราะมี cache อยู่แล้ว
     }
   };
 
@@ -138,19 +135,16 @@ export default function Home() {
           return;
         }
 
-        // รอให้ LIFF พร้อมเต็มที่
         await liff.ready;
 
         const profile = await liff.getProfile();
         setLiffProfile(profile);
         setIsLiffReady(true);
 
-        // ใช้ cache ก่อนแสดงผล (เร็วทันที)
         if (cachedData && Date.now() - cachedData.cachedAt < 10 * 60 * 1000) {
           setUserProfile(cachedData.userProfile);
         }
 
-        // ดึงข้อมูลจริงจาก backend เบื้องหลัง (ตอนนี้ accessToken มีแน่นอน)
         fetchUserFullProfile(profile.userId);
 
       } catch (error: any) {
@@ -163,7 +157,7 @@ export default function Home() {
     init();
   }, []);
 
-  // Refresh เมื่อกลับมาหน้า (หลัง 5 นาที)
+  // Refresh เมื่อกลับมาหน้า
   useEffect(() => {
     const handler = () => {
       if (document.visibilityState === 'visible' && liffProfile) {
@@ -205,16 +199,19 @@ export default function Home() {
     setShowDetails(prev => ({ ...prev, [tierName]: !prev[tierName] }));
   };
 
+  // สำหรับ Carousel สินค้าแนะนำ - เลื่อนทีละ 2 ชิ้น (440px)
+  const totalPages = 3; // 6 ชิ้น ÷ 2 = 3 หน้า
+
   const goToNextPage = () => {
-    if (currentPage < 2 && carouselRef.current) {
-      setCurrentPage(p => p + 1);
+    if (currentPage < totalPages - 1 && carouselRef.current) {
+      setCurrentPage(prev => prev + 1);
       carouselRef.current.scrollBy({ left: 440, behavior: 'smooth' });
     }
   };
 
   const goToPrevPage = () => {
     if (currentPage > 0 && carouselRef.current) {
-      setCurrentPage(p => p - 1);
+      setCurrentPage(prev => prev - 1);
       carouselRef.current.scrollBy({ left: -440, behavior: 'smooth' });
     }
   };
@@ -341,7 +338,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Quick Actions & Products เหมือนเดิม */}
+          {/* Quick Actions */}
           <div className="grid grid-cols-2 gap-6 mb-10">
             {[
               { icon: 'fa-ticket-alt', label: 'คูปองของฉัน', href: '/coupons' },
@@ -361,12 +358,22 @@ export default function Home() {
             ))}
           </div>
 
+          {/* สินค้าแนะนำ - เลื่อนทีละ 2 ชิ้น (440px) */}
           <h3 className="font-bold text-lg mb-4">สินค้าแนะนำสำหรับคุณ</h3>
           <div className="relative">
-            <button onClick={goToPrevPage} disabled={currentPage === 0} className={`absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-3 shadow-lg border-2 ${currentPage === 0 ? 'opacity-50' : 'hover:border-orange-400'}`}>
-              <i className="fas fa-chevron-left text-orange-500"></i>
+            <button
+              onClick={goToPrevPage}
+              disabled={currentPage === 0}
+              className={`absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-3 shadow-lg border-2 border-orange-200 transition-all ${currentPage === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:border-orange-400'}`}
+            >
+              <i className="fas fa-chevron-left text-orange-500 text-xl"></i>
             </button>
-            <div ref={carouselRef} className="flex space-x-4 overflow-x-auto pb-6 px-12 scrollbar-hide">
+
+            <div
+              ref={carouselRef}
+              className="flex space-x-4 overflow-x-auto pb-6 px-12 scrollbar-hide snap-x snap-mandatory"
+              style={{ scrollSnapType: 'x mandatory' }}
+            >
               {[
                 { name: 'แอมเซลกลูต้า พลัส', img: '/gluta.png' },
                 { name: 'แอมเซลซิงค์พลัส', img: '/zinc.png' },
@@ -375,7 +382,10 @@ export default function Home() {
                 { name: 'แคลเซียม แอลทรีโอเนต', img: '/Calcium.png' },
                 { name: 'อะมิโนบิลเบอร์รี่', img: '/amsel-amino-bilberry.png' },
               ].map((p, i) => (
-                <div key={i} className="flex-shrink-0 w-40 bg-white rounded-2xl border-2 border-orange-100 shadow-lg p-4 flex flex-col items-center hover:scale-105 transition-transform">
+                <div
+                  key={i}
+                  className="flex-shrink-0 w-40 snap-start bg-white rounded-2xl border-2 border-orange-100 shadow-lg p-4 flex flex-col items-center hover:scale-105 transition-transform"
+                >
                   <div className="w-full h-32 bg-orange-50 rounded-xl flex items-center justify-center mb-3">
                     <img src={p.img} alt={p.name} className="w-20 h-20 object-contain" />
                   </div>
@@ -386,8 +396,13 @@ export default function Home() {
                 </div>
               ))}
             </div>
-            <button onClick={goToNextPage} disabled={currentPage >= 2} className={`absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-3 shadow-lg border-2 ${currentPage >= 2 ? 'opacity-50' : 'hover:border-orange-400'}`}>
-              <i className="fas fa-chevron-right text-orange-500"></i>
+
+            <button
+              onClick={goToNextPage}
+              disabled={currentPage >= 2}
+              className={`absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-3 shadow-lg border-2 border-orange-200 transition-all ${currentPage >= 2 ? 'opacity-50 cursor-not-allowed' : 'hover:border-orange-400'}`}
+            >
+              <i className="fas fa-chevron-right text-orange-500 text-xl"></i>
             </button>
           </div>
         </div>
