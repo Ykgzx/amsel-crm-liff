@@ -202,7 +202,7 @@ export default function EditProfilePage() {
         phoneNumber: profile.phoneNumber.replace(/\D/g, ""),
         birthDate: profile.birthDate ? `${profile.birthDate}T00:00:00.000Z` : null,
       };
-
+      console.log(payload);
       const res = await fetch(`${BACKEND_URL}/api/users/profile`, {
         method: "PUT",
         credentials: "include",
