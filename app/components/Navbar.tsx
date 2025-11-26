@@ -4,8 +4,7 @@
 
 import { useEffect, useState } from 'react';
 import liff from '@line/liff';
-import Link from 'next/link';
-import Image from 'next/image'; // ใช้ Next/Image ดีกว่า <img> ธรรมดา (optional แต่แนะนำ)
+import Link from 'next/link';   // เพิ่มแค่บรรทัดนี้
 
 export default function Navbar() {
   const [profile, setProfile] = useState<{ pictureUrl?: string } | null>(null);
@@ -34,33 +33,26 @@ export default function Navbar() {
 
   return (
     <div className="fixed top-0 left-0 right-0 z-50 h-20 bg-gradient-to-r from-amber-500 via-white to-orange-500 flex items-center justify-center px-6 md:px-14">
-      <img src="/logo-amsel.png" alt="Amsel Logo" className="w-40" />
-
-      {/* รูปโปรไฟล์ที่คลิกแล้วไปหน้า Edit Profile */}
-      <Link
-        href="/editprofile"
-        className="absolute right-6 md:right-14 w-12 h-12 rounded-full overflow-hidden border-4 border-white shadow-lg transition-transform hover:scale-110 focus:outline-none ring-4 ring-white/30"
-        aria-label="แก้ไขโปรไฟล์"
-        prefetch={true} // prefetch ทันทีที่โหลด Navbar (เร็วสุด!)
-      >
-        {loading ? (
-          <div className="w-full h-full bg-white/30 animate-pulse" />
-        ) : profile?.pictureUrl && !error ? (
-          // ใช้ Next/Image จะดีที่สุด (optional)
-          <Image
-            src={profile.pictureUrl}
-            alt="รูปโปรไฟล์"
-            width={48}
-            height={48}
-            className="w-full h-full object-cover"
-            onError={() => setError(true)}
-            priority
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center">
-            <i className="fas fa-user text-white text-2xl" />
-          </div>
-        )}
+      <img src="/logo-amsel.png" className='w-40' alt="" />
+      
+      {/* แค่ห่อ div เดิมด้วย Link เท่านั้น */}
+      <Link href="/editprofile">
+        <div className="absolute right-6 md:right-14 w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-md cursor-pointer">
+          {loading ? (
+            <div className="w-full h-full bg-white/20 animate-pulse"></div>
+          ) : profile?.pictureUrl ? (
+            <img
+              src={profile.pictureUrl}
+              alt="Profile"
+              className="w-full h-full object-cover"
+              onError={() => setError(true)}
+            />
+          ) : (
+            <div className="w-full h-full bg-white/20 flex items-center justify-center">
+              <i className="fas fa-user text-white text-lg"></i>
+            </div>
+          )}
+        </div>
       </Link>
     </div>
   );
