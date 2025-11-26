@@ -13,11 +13,10 @@ import {
 } from "lucide-react";
 import liff from "@line/liff";
 import Swal from "sweetalert2";
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 const TITLE_OPTIONS = ["นาย", "นาง", "นางสาว"];
-const router = useRouter();
 
 interface UserProfile {
   title: string;
@@ -385,12 +384,11 @@ export default function EditProfilePage() {
             </div>
 
             <div className="flex gap-4 pt-8">
-                <button
-                    onClick={() => router.push('/')}   // หรือ router.back() ถ้าอยากย้อนกลับ
-                    className="flex items-center justify-center gap-2 flex-1 py-4 border-2 border-orange-200 text-gray-700 font-bold rounded-2xl hover:bg-orange-50 transition active:scale-95"
-                    >
-                    ยกเลิก
-                </button>
+                <Link href="/" className="flex-1">
+                    <button className="w-full py-4 border-2 border-orange-200 text-gray-700 font-bold rounded-2xl hover:bg-orange-50 transition">
+                        ยกเลิก
+                    </button>
+                </Link>
                 <button
                     onClick={handleSaveClick}
                     disabled={saving}
