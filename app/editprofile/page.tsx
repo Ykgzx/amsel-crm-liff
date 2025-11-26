@@ -1,22 +1,125 @@
 'use client';
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
-import { Camera, Mail, Phone, Calendar, User, Save, Gift, Star } from "lucide-react";
+import {
+  Mail,
+  Phone,
+  Calendar,
+  ChevronDown,
+  Loader2,
+  Save,
+} from "lucide-react";
+import liff from "@line/liff";
 
-export default function EditprofilePage() {
-  const [profilePic, setProfilePic] = useState<string | null>(null);
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ;
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setProfilePic(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+const TITLE_OPTIONS = ["นาย", "นาง", "นางสาว",];
+
+interface UserProfile {
+  title: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  birthdate: string;
+}
+
+export default function EditProfilePage() {
+  // จาก LINE LIFF (รูปเท่านั้นที่แก้ไม่ได้)
+  const [linePictureUrl, setLinePictureUrl] = useState<string | null>(null);
+
+  // จาก Backend (แก้ไขได้หมด)
+  const [profile, setProfile] = useState<UserProfile>({
+    title: "นาย",
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    birthdate: "",
+  });
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  // ดึงรูปจาก LINE LIFF
+  useEffect(() => {
+    const initLiff = async () => {
+      try {
+        await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID! });
+        if (liff.isLoggedIn()) {
+          const lineProfile = await liff.getProfile();
+          setLinePictureUrl(lineProfile.pictureUrl || null);
+        }
+      } catch (err) {
+        console.error("LIFF Error:", err);
+      }
+    };
+    initLiff();
+  }, []);
+
+  // ดึงข้อมูลส่วนตัวจาก Backend
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/users/profile`, {
+          method: "GET",
+          credentials: "include",
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          setProfile({
+            title: data.title || "นาย",
+            firstName: data.firstName || "",
+            lastName: data.lastName || "",
+            email: data.email || "",
+            phone: data.phone || "",
+            birthdate: data.birthdate || "",
+          });
+        }
+      } catch (err) {
+        console.error("Fetch profile error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/users/profile`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(profile),
+      });
+
+      if (res.ok) {
+        alert("บันทึกข้อมูลสำเร็จแล้วค่ะ");
+      } else {
+        alert("เกิดข้อผิดพลาด กรุณาลองใหม่");
+      }
+    } catch (err) {
+      alert("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้");
+    } finally {
+      setSaving(false);
     }
   };
+
+  if (loading) {
+    return (
+      <>
+        <Navbar />
+        <div className="min-h-screen bg-white flex items-center justify-center">
+          <Loader2 className="w-12 h-12 text-orange-500 animate-spin" />
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -26,55 +129,63 @@ export default function EditprofilePage() {
         <div className="max-w-md mx-auto px-6">
 
           {/* Header */}
-          <div className="mb-8 text-center">
+          <div className="mb-10 text-center">
             <div className="bg-orange-500 rounded-full px-8 py-3 w-fit mx-auto mb-6 shadow-lg">
               <h1 className="text-2xl font-bold text-white">แก้ไขโปรไฟล์</h1>
             </div>
 
-            {/* Profile Picture + Points */}
-            <div className="relative inline-block">
-              <div className="w-32 h-32 bg-orange-100 rounded-full border-4 border-white shadow-xl overflow-hidden mx-auto">
-                {profilePic ? (
-                  <img src={profilePic} alt="Profile" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <User className="w-16 h-16 text-orange-300" />
-                  </div>
-                )}
-              </div>
-
-              <label className="absolute bottom-1 right-1 bg-orange-500 hover:bg-orange-600 text-white rounded-full p-3 cursor-pointer shadow-xl transition-all">
-                <Camera className="w-6 h-6" />
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
+            {/* รูปโปรไฟล์จาก LINE (แก้ไม่ได้) */}
+            <div className="w-32 h-32 bg-orange-100 rounded-full border-4 border-white shadow-xl overflow-hidden mx-auto">
+              {linePictureUrl ? (
+                <img
+                  src={linePictureUrl}
+                  alt="Profile"
+                  className="w-full h-full object-cover"
                 />
-              </label>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-orange-50">
+                  <span className="text-5xl font-bold text-orange-300">
+                    {profile.firstName ? profile.firstName[0].toUpperCase() : "?"}
+                  </span>
+                </div>
+              )}
             </div>
 
-            
+            {/* ชื่อเต็ม (แก้ได้จาก backend) */}
+            <h2 className="mt-6 text-2xl font-bold text-gray-800">
+              {profile.title} {profile.firstName} {profile.lastName}
+            </h2>
           </div>
 
-          {/* Form Card */}
+          {/* ฟอร์มแก้ไข */}
           <div className="bg-white rounded-3xl border-2 border-orange-100 shadow-xl p-6 space-y-5">
 
+            {/* คำนำหน้าชื่อ */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">คำนำหน้าชื่อ</label>
-              <input
-                type="text"
-                placeholder="นาย / นาง / นางสาว"
-                className="w-full px-5 py-4 bg-orange-50 border border-orange-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300 text-gray-800 placeholder-gray-500"
-              />
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                คำนำหน้าชื่อ
+              </label>
+              <div className="relative">
+                <select
+                  value={profile.title}
+                  onChange={(e) => setProfile({ ...profile, title: e.target.value })}
+                  className="w-full px-5 py-4 bg-orange-50 border border-orange-200 rounded-2xl appearance-none focus:outline-none focus:ring-4 focus:ring-orange-300 text-gray-800 font-medium"
+                >
+                  {TITLE_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 text-orange-600 pointer-events-none" />
+              </div>
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">ชื่อ</label>
               <input
                 type="text"
-                placeholder="ชื่อจริง"
-                className="w-full px-5 py-4 bg-orange-50 border border-orange-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300 text-gray-800"
+                value={profile.firstName}
+                onChange={(e) => setProfile({ ...profile, firstName: e.target.value })}
+                className="w-full px-5 py-4 bg-orange-50 border border-orange-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300"
               />
             </div>
 
@@ -82,8 +193,9 @@ export default function EditprofilePage() {
               <label className="block text-sm font-semibold text-gray-700 mb-2">นามสกุล</label>
               <input
                 type="text"
-                placeholder="นามสกุล"
-                className="w-full px-5 py-4 bg-orange-50 border border-orange-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300 text-gray-800"
+                value={profile.lastName}
+                onChange={(e) => setProfile({ ...profile, lastName: e.target.value })}
+                className="w-full px-5 py-4 bg-orange-50 border border-orange-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300"
               />
             </div>
 
@@ -93,8 +205,10 @@ export default function EditprofilePage() {
               </label>
               <input
                 type="email"
-                placeholder="you@example.com"
-                className="w-full px-5 py-4 bg-orange-50 border border-orange-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300 text-gray-800"
+                value={profile.email}
+                onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+                placeholder="กรอกอีเมล"
+                className="w-full px-5 py-4 bg-orange-50 border border-orange-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300"
               />
             </div>
 
@@ -104,8 +218,10 @@ export default function EditprofilePage() {
               </label>
               <input
                 type="tel"
+                value={profile.phone}
+                onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
                 placeholder="08x xxx xxxx"
-                className="w-full px-5 py-4 bg-orange-50 border border-orange-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300 text-gray-800"
+                className="w-full px-5 py-4 bg-orange-50 border border-orange-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300"
               />
             </div>
 
@@ -115,18 +231,24 @@ export default function EditprofilePage() {
               </label>
               <input
                 type="date"
-                className="w-full px-5 py-4 bg-orange-50 border border-orange-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300 text-gray-800"
+                value={profile.birthdate}
+                onChange={(e) => setProfile({ ...profile, birthdate: e.target.value })}
+                className="w-full px-5 py-4 bg-orange-50 border border-orange-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-orange-300"
               />
             </div>
 
-            {/* Buttons */}
+            {/* ปุ่ม */}
             <div className="flex gap-4 pt-6">
               <button className="flex-1 py-4 border-2 border-orange-200 text-gray-700 font-bold rounded-2xl hover:bg-orange-50 transition">
                 ยกเลิก
               </button>
-              <button className="flex-1 py-4 bg-orange-500 text-white font-bold rounded-2xl hover:bg-orange-600 shadow-lg flex items-center justify-center gap-2 transition transform hover:scale-105">
-                <Save className="w-5 h-5" />
-                บันทึกการเปลี่ยนแปลง
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="flex-1 py-4 bg-orange-500 text-white font-bold rounded-2xl hover:bg-orange-600 shadow-lg flex items-center justify-center gap-2 transition transform hover:scale-105 disabled:opacity-70"
+              >
+                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                {saving ? "กำลังบันทึก..." : "บันทึกการเปลี่ยนแปลง"}
               </button>
             </div>
           </div>
