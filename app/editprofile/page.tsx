@@ -52,7 +52,7 @@ export default function EditProfilePage() {
 
   const today = new Date().toISOString().split("T")[0];
 
-  // ดึงรูปโปรไฟล์จาก LINE
+  // ดึงรูปจาก LINE
   useEffect(() => {
     const initLiff = async () => {
       try {
@@ -62,18 +62,17 @@ export default function EditProfilePage() {
           setLinePictureUrl(lineProfile.pictureUrl || null);
         }
       } catch (err) {
-        console.error("LIFF Init Error:", err);
+        console.error("LIFF Error:", err);
       }
     };
     initLiff();
   }, []);
 
-  // ดึงข้อมูลโปรไฟล์จาก backend
+  // ดึงข้อมูลโปรไฟล์
   useEffect(() => {
     const fetchProfile = async () => {
       await liff.ready;
       const accessToken = liff.getAccessToken();
-
       if (!accessToken) {
         console.warn("ไม่มี Access Token");
         setLoading(false);
@@ -99,16 +98,12 @@ export default function EditProfilePage() {
             firstName: data.firstName || "",
             lastName: data.lastName || "",
             email: data.email || "",
-            // รองรับทั้ง phone และ phoneNumber (กรณี backend ส่งไม่ตรงกัน)
-            phoneNumber: data.phone || data.phoneNumber || "",
-            // รองรับทั้ง birthdate และ birthDate
-            birthDate: data.birthdate || data.birthDate || "",
+            phoneNumber: data.phoneNumber || data.phone || "", // รองรับทั้งสองแบบ
+            birthDate: (data.birthDate || data.birthdate || "").split("T")[0], // แปลงเป็น YYYY-MM-DD
           });
-        } else {
-          console.error("ดึงข้อมูลไม่สำเร็จ", res.status);
         }
       } catch (err) {
-        console.error("Fetch profile error:", err);
+        console.error("Fetch error:", err);
       } finally {
         setLoading(false);
       }
@@ -153,7 +148,7 @@ export default function EditProfilePage() {
     }
   };
 
-  // บันทึกข้อมูล – สำคัญมาก: ใช้ชื่อ field ที่ backend ต้องการจริง ๆ
+  // บันทึกข้อมูล – ใช้ชื่อ field ตรงกับ DB และ backend ล่าสุด
   const confirmSave = async () => {
     setSaving(true);
     setShowConfirm(false);
@@ -161,7 +156,7 @@ export default function EditProfilePage() {
     await liff.ready;
     const accessToken = liff.getAccessToken();
     if (!accessToken) {
-      alert("ไม่พบ Access Token กรุณาลองใหม่");
+      alert("ไม่พบ Access Token");
       setSaving(false);
       return;
     }
@@ -172,11 +167,11 @@ export default function EditProfilePage() {
         firstName: profile.firstName.trim(),
         lastName: profile.lastName.trim(),
         email: profile.email.trim(),
-        phone: profile.phoneNumber.replace(/\D/g, ""),     // backend ต้องการ "phone"
-        birthdate: profile.birthDate,                      // backend ต้องการ "birthdate" (ไม่มี D ตัวใหญ่)
+        phoneNumber: profile.phoneNumber.replace(/\D/g, ""),  // ต้องเป็น phoneNumber
+        birthDate: profile.birthDate,                         // ต้องเป็น birthDate (มี D ตัวใหญ่)
       };
 
-      console.log("ส่งข้อมูลไป backend:", payload);
+      console.log("ส่งไป backend:", payload);
 
       const res = await fetch(`${BACKEND_URL}/api/users/profile`, {
         method: "PUT",
@@ -191,9 +186,9 @@ export default function EditProfilePage() {
       if (res.ok) {
         alert("บันทึกข้อมูลสำเร็จแล้วค่ะ");
       } else {
-        const errorText = await res.text();
-        console.error("บันทึกไม่สำเร็จ:", res.status, errorText);
-        alert("เกิดข้อผิดพลาด: " + (errorText || "กรุณาลองใหม่"));
+        const err = await res.text();
+        console.error("บันทึกไม่สำเร็จ:", res.status, err);
+        alert("เกิดข้อผิดพลาด: " + (err || "กรุณาลองใหม่"));
       }
     } catch (err) {
       console.error("Network error:", err);
@@ -247,7 +242,6 @@ export default function EditProfilePage() {
           {/* ฟอร์ม */}
           <div className="bg-white rounded-3xl border-2 border-orange-100 shadow-xl p-6 space-y-5">
 
-            {/* คำนำหน้าชื่อ */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">คำนำหน้าชื่อ</label>
               <div className="relative">
@@ -264,7 +258,6 @@ export default function EditProfilePage() {
               </div>
             </div>
 
-            {/* ชื่อจริง */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">ชื่อ <span className="text-red-500">*</span></label>
               <input
@@ -276,7 +269,6 @@ export default function EditProfilePage() {
               {errors.firstName && <p className="mt-1 text-sm text-red-600 flex items-center gap-1"><XCircle className="w-4 h-4" /> {errors.firstName}</p>}
             </div>
 
-            {/* นามสกุล */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">นามสกุล <span className="text-red-500">*</span></label>
               <input
@@ -288,7 +280,6 @@ export default function EditProfilePage() {
               {errors.lastName && <p className="mt-1 text-sm text-red-600 flex items-center gap-1"><XCircle className="w-4 h-4" /> {errors.lastName}</p>}
             </div>
 
-            {/* อีเมล */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 <Mail className="inline w-5 h-5 mr-1 text-orange-600" /> อีเมล <span className="text-red-500">*</span>
@@ -303,7 +294,6 @@ export default function EditProfilePage() {
               {errors.email && <p className="mt-1 text-sm text-red-600 flex items-center gap-1"><XCircle className="w-4 h-4" /> {errors.email}</p>}
             </div>
 
-            {/* เบอร์โทร */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 <Phone className="inline w-5 h-5 mr-1 text-orange-600" /> เบอร์โทรศัพท์ <span className="text-red-500">*</span>
@@ -323,7 +313,6 @@ export default function EditProfilePage() {
               {errors.phoneNumber && <p className="mt-1 text-sm text-red-600 flex items-center gap-1"><XCircle className="w-4 h-4" /> {errors.phoneNumber}</p>}
             </div>
 
-            {/* วันเกิด */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 <Calendar className="inline w-5 h-5 mr-1 text-orange-600" /> วันเกิด <span className="text-red-500">*</span>
@@ -338,7 +327,6 @@ export default function EditProfilePage() {
               {errors.birthDate && <p className="mt-1 text-sm text-red-600 flex items-center gap-1"><XCircle className="w-4 h-4" /> {errors.birthDate}</p>}
             </div>
 
-            {/* ปุ่ม */}
             <div className="flex gap-4 pt-8">
               <button className="flex-1 py-4 border-2 border-orange-200 text-gray-700 font-bold rounded-2xl hover:bg-orange-50 transition">
                 ยกเลิก
@@ -356,7 +344,7 @@ export default function EditProfilePage() {
         </div>
       </div>
 
-      {/* Popup ยืนยัน */}
+      {/* ยืนยันการบันทึก */}
       {showConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full">
