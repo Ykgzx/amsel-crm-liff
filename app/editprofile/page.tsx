@@ -9,10 +9,10 @@ import {
   ChevronDown,
   Loader2,
   Save,
-  AlertCircle,
   XCircle,
 } from "lucide-react";
 import liff from "@line/liff";
+import Swal from "sweetalert2";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 const TITLE_OPTIONS = ["นาย", "นาง", "นางสาว"];
@@ -23,7 +23,7 @@ interface UserProfile {
   lastName: string;
   email: string;
   phoneNumber: string;
-  birthDate: string; // รูปแบบ YYYY-MM-DD สำหรับ input date
+  birthDate: string;
 }
 
 interface Errors {
@@ -48,11 +48,10 @@ export default function EditProfilePage() {
   const [errors, setErrors] = useState<Errors>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
 
   const today = new Date().toISOString().split("T")[0];
 
-  // ดึงรูปจาก LINE
+  // ดึงรูปโปรไฟล์จาก LINE
   useEffect(() => {
     const initLiff = async () => {
       try {
@@ -68,7 +67,7 @@ export default function EditProfilePage() {
     initLiff();
   }, []);
 
-  // ดึงข้อมูลโปรไฟล์
+  // ดึงข้อมูลโปรไฟล์จาก Backend
   useEffect(() => {
     const fetchProfile = async () => {
       await liff.ready;
@@ -91,15 +90,12 @@ export default function EditProfilePage() {
 
         if (res.ok) {
           const data = await res.json();
-          console.log("ข้อมูลจาก backend:", data);
-
           setProfile({
             title: data.title || "นาย",
             firstName: data.firstName || "",
             lastName: data.lastName || "",
             email: data.email || "",
             phoneNumber: data.phoneNumber || data.phone || "",
-            // แปลงจาก ISO datetime → YYYY-MM-DD
             birthDate: data.birthDate
               ? data.birthDate.split("T")[0]
               : data.birthdate
@@ -147,21 +143,52 @@ export default function EditProfilePage() {
     return Object.keys(newErrors).length === 0;
   };
 
+  // กดปุ่มบันทึก → แสดง SweetAlert ยืนยัน
   const handleSaveClick = () => {
     if (validateForm()) {
-      setShowConfirm(true);
+      Swal.fire({
+        title: "ยืนยันการบันทึกข้อมูล?",
+        text: "ระบบจะอัปเดตข้อมูลโปรไฟล์ของคุณ",
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonText: "ตกลง บันทึกเลย",
+        cancelButtonText: "ยกเลิก",
+        reverseButtons: true,
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        heightAuto: false,
+        backdrop: true, // เปิดใช้ backdrop blur (default ของ SweetAlert2 คือ blur + overlay)
+        customClass: {
+          popup: "rounded-3xl shadow-2xl border border-gray-100",
+          title: "text-xl font-bold text-gray-800 mb-3",
+          htmlContainer: "text-gray-600 text-sm mb-6",
+          confirmButton: "px-8 py-3 bg-orange-500 text-white font-bold rounded-2xl hover:bg-orange-600 shadow-lg transition mx-2",
+          cancelButton: "px-8 py-3 border-2 border-gray-300 text-gray-700 font-bold rounded-2xl hover:bg-gray-50 transition mx-2",
+        },
+      }).then((result) => {
+        if (result.isConfirmed) {
+          confirmSave();
+        }
+      });
     }
   };
 
-  // บันทึกข้อมูล – สำคัญมาก: birthDate ต้องเป็น ISO datetime
+  // บันทึกข้อมูลจริง
   const confirmSave = async () => {
     setSaving(true);
-    setShowConfirm(false);
 
     await liff.ready;
     const accessToken = liff.getAccessToken();
     if (!accessToken) {
-      alert("ไม่พบ Access Token");
+      Swal.fire({
+        icon: "error",
+        title: "เกิดข้อผิดพลาด",
+        text: "ไม่พบ Access Token",
+        confirmButtonText: "ตกลง",
+        customClass: {
+          confirmButton: "px-6 py-3 bg-orange-500 text-white font-bold rounded-2xl",
+        },
+      });
       setSaving(false);
       return;
     }
@@ -173,10 +200,8 @@ export default function EditProfilePage() {
         lastName: profile.lastName.trim(),
         email: profile.email.trim(),
         phoneNumber: profile.phoneNumber.replace(/\D/g, ""),
-        birthDate: profile.birthDate ? `${profile.birthDate}T00:00:00.000Z` : null, // แก้ตรงนี้!
+        birthDate: profile.birthDate ? `${profile.birthDate}T00:00:00.000Z` : null,
       };
-
-      console.log("ส่งไป backend (ISO datetime):", payload);
 
       const res = await fetch(`${BACKEND_URL}/api/users/profile`, {
         method: "PUT",
@@ -189,15 +214,40 @@ export default function EditProfilePage() {
       });
 
       if (res.ok) {
-        alert("บันทึกข้อมูลสำเร็จแล้วค่ะ");
+        await Swal.fire({
+          icon: "success",
+          title: "บันทึกสำเร็จ!",
+          text: "ข้อมูลโปรไฟล์ของคุณได้รับการอัปเดตแล้ว",
+          timer: 2000,
+          timerProgressBar: true,
+          showConfirmButton: false,
+          customClass: {
+            popup: "rounded-3xl",
+          },
+        });
       } else {
         const err = await res.text();
-        console.error("บันทึกไม่สำเร็จ:", res.status, err);
-        alert("เกิดข้อผิดพลาด: " + (err || "กรุณาลองใหม่"));
+        await Swal.fire({
+          icon: "error",
+          title: "บันทึกไม่สำเร็จ",
+          text: err || "กรุณาลองใหม่ภายหลัง",
+          confirmButtonText: "ตกลง",
+          customClass: {
+            confirmButton: "px-6 py-3 bg-orange-500 text-white font-bold rounded-2xl",
+          },
+        });
       }
     } catch (err) {
       console.error("Network error:", err);
-      alert("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้");
+      await Swal.fire({
+        icon: "error",
+        title: "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์",
+        text: "กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต",
+        confirmButtonText: "ตกลง",
+        customClass: {
+          confirmButton: "px-6 py-3 bg-orange-500 text-white font-bold rounded-2xl",
+        },
+      });
     } finally {
       setSaving(false);
     }
@@ -348,35 +398,6 @@ export default function EditProfilePage() {
           </div>
         </div>
       </div>
-
-      {/* ยืนยันการบันทึก */}
-      {showConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <AlertCircle className="w-10 h-10 text-orange-600" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-800 mb-3">ยืนยันการบันทึกข้อมูล?</h3>
-              <p className="text-gray-600 mb-8">ระบบจะอัปเดตข้อมูลโปรไฟล์ของคุณ</p>
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowConfirm(false)}
-                className="flex-1 py-3 border-2 border-gray-300 text-gray-700 font-bold rounded-2xl hover:bg-gray-50 transition"
-              >
-                ยกเลิก
-              </button>
-              <button
-                onClick={confirmSave}
-                className="flex-1 py-3 bg-orange-500 text-white font-bold rounded-2xl hover:bg-orange-600 shadow-lg transition"
-              >
-                ตกลง บันทึกเลย
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }
