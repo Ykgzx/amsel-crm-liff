@@ -269,7 +269,7 @@ export default function Home() {
           <div className="grid grid-cols-2 gap-6 mb-12">
             {[
               { icon: 'fa-ticket-alt', label: 'คูปองของฉัน', href: '/coupons' },
-              { icon: 'fa-clipboard-list', label: 'ประวัติการสั่งซื้อ', href: '/orders' },
+              { icon: 'fa-clipboard-list', label: 'ประวัติการสั่งซื้อ', href: '/history' },
               { icon: 'fa-map-marker-alt', label: 'ที่อยู่', href: '/addresses' },
               { icon: 'fa-comment-dots', label: 'รีวิว', href: '/reviews' },
               { icon: 'fa-receipt', label: 'อัปโหลดใบเสร็จ', href: '/receiptupload' },
