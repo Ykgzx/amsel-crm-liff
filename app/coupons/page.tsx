@@ -1,24 +1,141 @@
+// app/coupons/page.tsx
 'use client';
 
+import { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
-import { useState } from "react";
+import liff from "@line/liff";
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.amsel-crm.com";
+
+interface Coupon {
+  id: number;
+  code: string;
+  discount: string;
+  description: string;
+  expiresAt: string; // ISO string หรือ "2025-12-31"
+  badge?: string;    // เช่น "พิเศษ!", "HOT!", "ใหม่!"
+}
 
 export default function CouponsPage() {
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null); // ชื่อตัวแปรนี้สำคัญ
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
-  const coupons = [
-    { id: 1, code: "WELCOME50", discount: "ลด 50%", desc: "สำหรับสมาชิกใหม่", expires: "30 พ.ย. 2568" },
-    { id: 2, code: "FREESHIP100", discount: "ฟรีค่าส่ง", desc: "เมื่อซื้อครบ 500 บาท", expires: "31 ธ.ค. 2568" },
-    { id: 3, code: "SAVE200", discount: "ลด 200 บาท", desc: "เมื่อซื้อครบ 1,500 บาท", expires: "15 ธ.ค. 2568" },
-    { id: 4, code: "GOLD25", discount: "ลดเพิ่ม 25%", desc: "สำหรับ Gold Tier ขึ้นไป", expires: "31 ม.ค. 2569", badge: "พิเศษ!" },
-    { id: 5, code: "FLASH300", discount: "ลดทันที 300 บาท", desc: "วันนี้วันเดียว!", expires: "หมดเขตวันนี้", badge: "HOT!" },
-  ];
+  // ดึงคูปองจาก Backend
+  useEffect(() => {
+    const fetchCoupons = async () => {
+      try {
+        await liff.ready;
+        const accessToken = liff.getAccessToken();
+        const profile = liff.isLoggedIn() ? await liff.getProfile() : null;
+
+        const headers: HeadersInit = {
+          "Content-Type": "application/json",
+        };
+        if (accessToken && profile) {
+          headers["Authorization"] = `Bearer ${accessToken}`;
+          headers["X-Line-UserId"] = profile.userId;
+        }
+
+        const res = await fetch(`${BACKEND_URL}/api/coupons`, { headers });
+
+        if (!res.ok) throw new Error("ไม่สามารถดึงคูปองได้");
+
+        const data = await res.json();
+        setCoupons(data.coupons || data); // รองรับทั้ง { coupons: [...] } และ [...]
+      } catch (err: any) {
+        console.error("Fetch coupons error:", err);
+        setError("โหลดคูปองไม่สำเร็จ กรุณาลองใหม่");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCoupons();
+  }, []);
 
   const handleCopy = (code: string, index: number) => {
     navigator.clipboard.writeText(code);
     setCopiedIndex(index);
     setTimeout(() => setCopiedIndex(null), 2000);
   };
+
+  // แปลงวันที่ให้สวย
+  const formatExpires = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr);
+      const now = new Date();
+      const isToday = date.toDateString() === now.toDateString();
+
+      if (isToday) return "หมดเขตวันนี้";
+      return date.toLocaleDateString("th-TH", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  // Loading State
+  if (loading) {
+    return (
+      <>
+        <Navbar />
+        <div className="bg-white min-h-screen pt-24 pb-12">
+          <div className="max-w-md mx-auto px-6 pt-10">
+            <div className="text-center mb-8">
+              <div className="w-20 h-20 bg-gray-200 rounded-full mx-auto mb-4 animate-pulse" />
+              <div className="h-8 bg-gray-200 rounded w-48 mx-auto animate-pulse" />
+            </div>
+            <div className="space-y-5">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="bg-gray-100 rounded-2xl h-48 animate-pulse" />
+              ))}
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // Error State
+  if (error) {
+    return (
+      <>
+        <Navbar />
+        <div className="bg-white min-h-screen pt-24 flex items-center justify-center px-6">
+          <div className="text-center">
+            <div className="text-6xl mb-4">Error</div>
+            <p className="text-red-600 text-lg mb-6">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-8 py-4 bg-orange-500 text-white rounded-full font-bold"
+            >
+              ลองใหม่
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // Empty State
+  if (coupons.length === 0) {
+    return (
+      <>
+        <Navbar />
+        <div className="bg-white min-h-screen pt-24 pb-12">
+          <div className="max-w-md mx-auto px-6 pt-10 text-center">
+            <div className="text-6xl mb-6">No coupons</div>
+            <p className="text-xl text-gray-600">ยังไม่มีคูปองในตอนนี้<br />กรุณารอโปรโมชั่นใหม่เร็วๆ นี้!</p>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -44,10 +161,10 @@ export default function CouponsPage() {
             {coupons.map((coupon, index) => (
               <div
                 key={coupon.id}
-                className="bg-white border-2 border-orange-100 rounded-2xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-300 relative"
+                className="bg-white border-2 border-orange-100 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 relative"
               >
                 {coupon.badge && (
-                  <div className="absolute top-3 right-3 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-md z-10">
+                  <div className="absolute top-3 right-3 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-md z-10 animate-pulse">
                     {coupon.badge}
                   </div>
                 )}
@@ -58,7 +175,7 @@ export default function CouponsPage() {
                       <div className="text-3xl font-extrabold text-orange-600">
                         {coupon.discount}
                       </div>
-                      <p className="text-gray-700 font-medium mt-1">{coupon.desc}</p>
+                      <p className="text-gray-700 font-medium mt-1">{coupon.description}</p>
                     </div>
 
                     <div className="text-right">
@@ -70,15 +187,15 @@ export default function CouponsPage() {
 
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-gray-500">
-                      หมดอายุ: <span className="font-medium text-gray-700">{coupon.expires}</span>
+                      หมดอายุ: <span className="font-medium text-gray-700">{formatExpires(coupon.expiresAt)}</span>
                     </p>
 
                     <button
                       onClick={() => handleCopy(coupon.code, index)}
-                      className={`px-6 py-3 rounded-full font-bold text-sm transition-all flex items-center gap-2 ${
+                      className={`px-6 py-3 rounded-full font-bold text-sm transition-all flex items-center gap-2 shadow-md ${
                         copiedIndex === index
                           ? "bg-green-500 text-white"
-                          : "bg-orange-500 text-white hover:bg-orange-600 shadow-md"
+                          : "bg-orange-500 text-white hover:bg-orange-600"
                       }`}
                     >
                       {copiedIndex === index ? (
@@ -109,7 +226,6 @@ export default function CouponsPage() {
             <p className="text-xs text-gray-500 leading-relaxed">
               * คูปอง 1 ท่าน ใช้ได้ 1 ครั้งต่อการสั่งซื้อ<br />
               * ไม่สามารถใช้ร่วมกับโปรโมชั่นอื่นได้<br />
-              * กรุณากรอกคูปองที่หน้าเช็คเอาท์
             </p>
           </div>
 
