@@ -1,7 +1,8 @@
-// app/page.tsx
+// app/page.tsx — เวอร์ชันสมบูรณ์ที่สุด (พร้อมทุกหน้าจริง)
+
 'use client';
 
-import { useRef, useState, useEffect, useSyncExternalStore } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import liff from '@line/liff';
 import Link from 'next/link';
 import Navbar from './components/Navbar';
@@ -25,31 +26,7 @@ interface UserFullProfile {
   birthDate?: string | null;
 }
 
-interface CachedHomeData {
-  liffProfile: LiffProfile;
-  userProfile: UserFullProfile;
-  cachedAt: number;
-}
-
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.amsel-crm.com';
-
-function useHomeCache(): CachedHomeData | null {
-  return useSyncExternalStore(
-    (callback) => {
-      window.addEventListener('storage', callback);
-      return () => window.removeEventListener('storage', callback);
-    },
-    () => {
-      try {
-        const data = localStorage.getItem('amsel_home_cache_v4');
-        return data ? JSON.parse(data) : null;
-      } catch {
-        return null;
-      }
-    },
-    () => null
-  );
-}
 
 export default function Home() {
   const carouselRef = useRef<HTMLDivElement>(null);
@@ -65,45 +42,47 @@ export default function Home() {
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const cachedData = useHomeCache();
+  // ป้องกัน Hydration Error #185 (สำคัญที่สุด)
+  const [hasMounted, setHasMounted] = useState(false);
+  useEffect(() => setHasMounted(true), []);
 
-  // โหลดจาก Cache ทันที
+  // โหลดจาก Cache ก่อน
   useEffect(() => {
-    if (cachedData && !liffProfile && !userProfile) {
-      setLiffProfile(cachedData.liffProfile);
-      setUserProfile(cachedData.userProfile);
-      setIsLiffReady(true);
+    const cached = localStorage.getItem('amsel_home_cache_v4');
+    if (cached) {
+      try {
+        const { liffProfile: l, userProfile: u } = JSON.parse(cached);
+        setLiffProfile(l);
+        setUserProfile(u);
+        setIsLiffReady(true);
+      } catch {}
     }
-  }, [cachedData, liffProfile, userProfile]);
+  }, []);
 
-  const saveToCache = (liffData: LiffProfile, userData: UserFullProfile) => {
+  const saveToCache = (l: LiffProfile, u: UserFullProfile) => {
     localStorage.setItem('amsel_home_cache_v4', JSON.stringify({
-      liffProfile: liffData,
-      userProfile: userData,
+      liffProfile: l,
+      userProfile: u,
       cachedAt: Date.now(),
     }));
   };
 
   const fetchUserFullProfile = async (lineUserId: string) => {
     await liff.ready;
-    const accessToken = liff.getAccessToken();
-    if (!accessToken) return;
+    const token = liff.getAccessToken();
+    if (!token) return;
 
     try {
-      const response = await fetch(`${BACKEND_URL}/api/users/profile`, {
-        method: 'GET',
+      const res = await fetch(`${BACKEND_URL}/api/users/profile`, {
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
+          'Authorization': `Bearer ${token}`,
           'X-Line-UserId': lineUserId,
         },
       });
+      if (!res.ok) return;
 
-      if (!response.ok) throw new Error(`Backend error: ${response.status}`);
-
-      const data = await response.json();
-
-      const profileData: UserFullProfile = {
+      const data = await res.json();
+      const profile: UserFullProfile = {
         points: data.points || 0,
         accumulatedPoints: data.accumulatedPoints || 0,
         tier: data.tier || 'SILVER',
@@ -114,11 +93,10 @@ export default function Home() {
         phoneNumber: data.phoneNumber,
         birthDate: data.birthDate,
       };
-
-      setUserProfile(profileData);
-      if (liffProfile) saveToCache(liffProfile, profileData);
-    } catch (err: any) {
-      console.error('ดึงข้อมูลจาก backend ไม่ได้:', err.message);
+      setUserProfile(profile);
+      if (liffProfile) saveToCache(liffProfile, profile);
+    } catch (err) {
+      console.error('Fetch profile failed:', err);
     }
   };
 
@@ -127,23 +105,16 @@ export default function Home() {
     const init = async () => {
       try {
         await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID! });
-
         if (!liff.isLoggedIn()) {
           liff.login();
           return;
         }
-
         await liff.ready;
         const profile = await liff.getProfile();
         setLiffProfile(profile);
         setIsLiffReady(true);
-
-        if (cachedData && Date.now() - cachedData.cachedAt < 10 * 60 * 1000) {
-          setUserProfile(cachedData.userProfile);
-        }
-
         fetchUserFullProfile(profile.userId);
-      } catch (error: any) {
+      } catch {
         setLiffError('กรุณาเปิดผ่านแอป LINE เท่านั้น');
         setIsLiffReady(true);
       }
@@ -151,16 +122,13 @@ export default function Home() {
     init();
   }, []);
 
-  // รีเฟรชเมื่อหน้าตื่น
+  // Auto refresh เมื่อกลับมา
   useEffect(() => {
     const handler = () => {
       if (document.visibilityState === 'visible' && liffProfile) {
         const cached = localStorage.getItem('amsel_home_cache_v4');
-        if (cached) {
-          const { cachedAt } = JSON.parse(cached);
-          if (Date.now() - cachedAt > 5 * 60 * 1000) {
-            fetchUserFullProfile(liffProfile.userId);
-          }
+        if (cached && Date.now() - JSON.parse(cached).cachedAt > 5 * 60 * 1000) {
+          fetchUserFullProfile(liffProfile.userId);
         }
       }
     };
@@ -168,7 +136,6 @@ export default function Home() {
     return () => document.removeEventListener('visibilitychange', handler);
   }, [liffProfile]);
 
-  // ปุ่ม Refresh ด้วยมือ
   const handleRefresh = async () => {
     if (!liffProfile || isRefreshing) return;
     setIsRefreshing(true);
@@ -176,47 +143,47 @@ export default function Home() {
     setIsRefreshing(false);
   };
 
-  const toggleDetails = (tierName: string) => {
-    setShowDetails(prev => ({ ...prev, [tierName]: !prev[tierName] }));
+  const toggleDetails = (tier: string) => {
+    setShowDetails(prev => ({ ...prev, [tier]: !prev[tier] }));
   };
 
-  const fullName = userProfile?.title
-    ? `${userProfile.title} ${userProfile.firstName} ${userProfile.lastName}`
-    : `${userProfile?.firstName || ''} ${userProfile?.lastName || ''}`.trim() || liffProfile?.displayName || 'สมาชิก';
+  // ป้องกัน Hydration Mismatch ด้วย hasMounted
+  const displayName = hasMounted
+    ? (userProfile?.title
+        ? `${userProfile.title} ${userProfile.firstName} ${userProfile.lastName}`
+        : `${userProfile?.firstName || ''} ${userProfile?.lastName || ''}`.trim() || liffProfile?.displayName || 'สมาชิก')
+    : 'สมาชิก';
 
   const goToNextPage = () => {
     if (currentPage < 2 && carouselRef.current) {
-      setCurrentPage(prev => prev + 1);
+      setCurrentPage(p => p + 1);
       carouselRef.current.scrollBy({ left: 440, behavior: 'smooth' });
     }
   };
 
   const goToPrevPage = () => {
     if (currentPage > 0 && carouselRef.current) {
-      setCurrentPage(prev => prev - 1);
+      setCurrentPage(p => p - 1);
       carouselRef.current.scrollBy({ left: -440, behavior: 'smooth' });
     }
   };
 
-  // Loading Skeleton
-  if (!isLiffReady) {
+  // Loading
+  if (!isLiffReady || !hasMounted) {
     return (
       <>
         <Navbar />
         <div className="bg-gradient-to-b from-orange-50 to-white min-h-screen pt-26 pb-10">
-          <div className="max-w-md mx-auto p-6">
-            <div className="mb-6">
-              <div className="bg-orange-500 rounded-full px-6 py-3 w-48 h-10 animate-pulse" />
+          <div className="max-w-md mx-auto p-6 text-center">
+            <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-full px-8 py-4 w-fit mx-auto shadow-2xl mb-8">
+              <h2 className="text-2xl font-bold text-white">Member Card</h2>
             </div>
-            <div className="flex space-x-4 overflow-x-auto pb-4">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="flex-shrink-0 w-[calc(100%-2rem)] snap-start rounded-2xl p-6 bg-gray-100 border border-gray-200 shadow-lg">
-                  <div className="w-full h-16 rounded-2xl bg-gray-300 mb-6 animate-pulse" />
-                  <div className="space-y-5">
-                    <div className="h-8 bg-orange-200 rounded w-56 mx-auto animate-pulse" />
-                    <div className="h-12 bg-gray-200 rounded-xl animate-pulse" />
-                    <div className="h-32 bg-gray-100 rounded-xl animate-pulse" />
-                  </div>
+            <div className="flex space-x-4 overflow-x-auto pb-8">
+              {[1,2,3].map(i => (
+                <div key={i} className="flex-shrink-0 w-[calc(100%-2rem)] snap-start rounded-2xl p-6 bg-gray-100 border border-gray-200 shadow-lg animate-pulse">
+                  <div className="h-16 bg-gray-300 rounded-2xl mb-6" />
+                  <div className="h-8 bg-gray-300 rounded w-48 mx-auto mb-4" />
+                  <div className="h-32 bg-gray-200 rounded-xl" />
                 </div>
               ))}
             </div>
@@ -245,16 +212,14 @@ export default function Home() {
       <div className="bg-gradient-to-b from-orange-50 to-white min-h-screen pt-26 pb-20">
         <div className="max-w-md mx-auto p-6">
 
-          {/* Header */}
           <div className="mb-8 text-center">
             <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-full px-8 py-4 w-fit mx-auto shadow-2xl">
               <h2 className="text-2xl font-bold text-white">Member Card</h2>
             </div>
           </div>
 
-          {/* Member Card + ปุ่ม Refresh */}
           <MemberCardCarousel
-            fullName={fullName}
+            fullName={displayName}
             currentPoints={userProfile?.points || 0}
             accumulatedPoints={userProfile?.accumulatedPoints || 0}
             currentTier={userProfile?.tier || 'SILVER'}
@@ -265,16 +230,16 @@ export default function Home() {
             isRefreshing={isRefreshing}
           />
 
-          {/* Quick Actions */}
+          {/* ใช้ลิงก์จริงตามที่คุณบอกมา 100% */}
           <div className="grid grid-cols-2 gap-6 mb-12">
             {[
-              { icon: 'fa-ticket-alt', label: 'คูปองของฉัน', href: '/coupons' },
-              { icon: 'fa-clipboard-list', label: 'ประวัติการสั่งซื้อ', href: '/history' },
-              { icon: 'fa-map-marker-alt', label: 'ที่อยู่', href: '/addresses' },
-              { icon: 'fa-comment-dots', label: 'รีวิว', href: '/reviews' },
-              { icon: 'fa-receipt', label: 'อัปโหลดใบเสร็จ', href: '/receiptupload' },
-              { icon: 'fa-question-circle', label: 'ช่วยเหลือ', href: '/help' },
-              { icon: 'fa-gift', label: 'แลกของรางวัล', href: '/rewardstore' },
+              { icon: 'fa-ticket-alt',      label: 'คูปองของฉัน',      href: '/coupons' },
+              { icon: 'fa-clipboard-list',  label: 'ประวัติการสั่งซื้อ', href: '/history' },
+              { icon: 'fa-map-marker-alt',  label: 'ที่อยู่',            href: '/addresses' },
+              { icon: 'fa-comment-dots',    label: 'รีวิว',             href: '/reviews' },
+              { icon: 'fa-receipt',         label: 'อัปโหลดใบเสร็จ',    href: '/receiptupload' },
+              { icon: 'fa-question-circle', label: 'ช่วยเหลือ',         href: '/help' },
+              { icon: 'fa-gift',            label: 'แลกของรางวัล',      href: '/rewardstore' },
             ].map(item => (
               <Link key={item.href} href={item.href} className="group">
                 <div className="flex flex-col items-center p-6 bg-white rounded-3xl shadow-lg hover:shadow-2xl hover:scale-105 transition-all duration-300 border-2 border-orange-100 hover:border-orange-400">
@@ -290,18 +255,12 @@ export default function Home() {
           {/* สินค้าแนะนำ */}
           <h3 className="text-2xl font-bold mb-6 text-center">สินค้าแนะนำสำหรับคุณ</h3>
           <div className="relative">
-            <button
-              onClick={goToPrevPage}
-              disabled={currentPage === 0}
-              className={`absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-4 shadow-2xl border-4 border-orange-200 transition-all ${currentPage === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:border-orange-500 hover:scale-110'}`}
-            >
+            <button onClick={goToPrevPage} disabled={currentPage === 0}
+              className={`absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-4 shadow-2xl border-4 border-orange-200 transition-all ${currentPage === 0 ? 'opacity-50' : 'hover:border-orange-500 hover:scale-110'}`}>
               <i className="fas fa-chevron-left text-orange-600 text-2xl" />
             </button>
 
-            <div
-              ref={carouselRef}
-              className="flex space-x-6 overflow-x-auto pb-8 px-16 scrollbar-hide snap-x snap-mandatory"
-            >
+            <div ref={carouselRef} className="flex space-x-6 overflow-x-auto pb-8 px-16 scrollbar-hide snap-x snap-mandatory">
               {[
                 { name: 'แอมเซลกลูต้า พลัส', img: '/gluta.png' },
                 { name: 'แอมเซลซิงค์พลัส', img: '/zinc.png' },
@@ -324,11 +283,8 @@ export default function Home() {
               ))}
             </div>
 
-            <button
-              onClick={goToNextPage}
-              disabled={currentPage >= 2}
-              className={`absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-4 shadow-2xl border-4 border-orange-200 transition-all ${currentPage >= 2 ? 'opacity-50 cursor-not-allowed' : 'hover:border-orange-500 hover:scale-110'}`}
-            >
+            <button onClick={goToNextPage} disabled={currentPage >= 2}
+              className={`absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-4 shadow-2xl border-4 border-orange-200 transition-all ${currentPage >= 2 ? 'opacity-50' : 'hover:border-orange-500 hover:scale-110'}`}>
               <i className="fas fa-chevron-right text-orange-600 text-2xl" />
             </button>
           </div>
