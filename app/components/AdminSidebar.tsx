@@ -17,10 +17,6 @@ export default function AdminSidebar() {
 
   return (
     <div className="w-64 bg-gray-900 text-white flex flex-col h-screen sticky top-0">
-      {/* Logo */}
-      <div className="p-6 border-b border-gray-800">
-        <h1 className="text-2xl font-bold">AMSEL ADMIN</h1>
-      </div>
 
       {/* Menu */}
       <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
