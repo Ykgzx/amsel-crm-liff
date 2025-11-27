@@ -3,21 +3,8 @@
 
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { useEffect, useState } from 'react';
-
-// แก้ปัญหาไอคอนหายใน React
+import { useState, useEffect } from 'react';
 import L from 'leaflet';
-import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
-import markerIcon from 'leaflet/dist/images/marker-icon.png';
-import markerShadow from 'leaflet/dist/images/marker-shadow.png';
-
-// แทนที่ไอคอนเริ่มต้น
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: markerIcon2x.src,
-  iconUrl: markerIcon.src,
-  shadowUrl: markerShadow.src,
-});
 
 export type Store = {
   id: number;
@@ -32,8 +19,23 @@ type StoreMapProps = {
   stores: Store[];
 };
 
+// สร้างไอคอนโดยใช้ L.Icon
+const createIcon = () =>
+  new L.Icon({
+    iconUrl: '/marker-icon.png',
+    iconRetinaUrl: '/marker-icon-2x.png',
+    shadowUrl: '/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41],
+  });
+
+const userIcon = createIcon();
+const storeIcon = createIcon();
+
 export default function StoreMap({ userLocation, stores }: StoreMapProps) {
-  const [mapCenter, setMapCenter] = useState<[number, number]>([13.7563, 100.5018]); // [lat, lng]
+  const [mapCenter, setMapCenter] = useState<[number, number]>([13.7563, 100.5018]);
   const [zoom, setZoom] = useState(12);
 
   useEffect(() => {
@@ -56,24 +58,21 @@ export default function StoreMap({ userLocation, stores }: StoreMapProps) {
         zIndex: 0,
       }}
     >
-      {/* Tile จาก OpenStreetMap */}
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
 
-      {/* Marker ผู้ใช้ */}
       {userLocation && (
-        <Marker position={[userLocation.lat, userLocation.lng]}>
+        <Marker position={[userLocation.lat, userLocation.lng]} icon={userIcon}>
           <Popup>
             <div className="font-bold text-gray-900">ตำแหน่งของคุณ</div>
           </Popup>
         </Marker>
       )}
 
-      {/* Marker ร้านค้า */}
       {stores.map((store) => (
-        <Marker key={store.id} position={[store.lat, store.lng]}>
+        <Marker key={store.id} position={[store.lat, store.lng]} icon={storeIcon}>
           <Popup>
             <div>
               <h4 className="font-bold text-gray-900">{store.name}</h4>

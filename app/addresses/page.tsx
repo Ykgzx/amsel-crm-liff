@@ -23,7 +23,7 @@ export default function AddressesPage() {
   const [error, setError] = useState<string | null>(null);
 
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 6371; // รัศมีโลกในหน่วยกิโลเมตร
+    const R = 6371;
     const toRad = (value: number) => (value * Math.PI) / 180;
     const dLat = toRad(lat2 - lat1);
     const dLon = toRad(lon2 - lon1);
