@@ -2,7 +2,7 @@
 'use client';
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { CheckCircle, XCircle, ZoomIn } from 'lucide-react';
+import { CheckCircle, XCircle, Search } from 'lucide-react';
 
 const healthData = [
   { name: 'Skin', value: 40 },
@@ -14,7 +14,7 @@ export default function DashboardPage() {
     <>
       <h2 className="text-3xl font-bold text-gray-800 mb-8">Dashboard Overview</h2>
 
-      {/* Top Cards */}
+      {/* Top 3 Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
           <p className="text-gray-600 text-sm">Total Members</p>
@@ -36,8 +36,9 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Left */}
+        {/* Left Column */}
         <div className="space-y-6">
+          {/* Health Chart */}
           <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">
               Customer Health Concerns (Quiz Data)
@@ -55,6 +56,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          {/* Customer Insight */}
           <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
             <div className="flex items-center space-x-3 mb-4">
               <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
@@ -66,13 +68,21 @@ export default function DashboardPage() {
             </div>
 
             <div className="space-y-3 text-sm">
-              <div className="flex justify-between"><span className="text-gray-600">Goal:</span><span className="font-medium">Skin Care</span></div>
-              <div className="flex justify-between"><span className="text-gray-600">Tier:</span><span className="px-3 py-1 bg-gray-200 rounded-full text-xs font-medium">Silver</span></div>
-              <div className="text-gray-600 text-xs">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Goal:</span>
+                <span className="font-medium">Skin Care</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Tier:</span>
+                <span className="px-3 py-1 bg-gray-200 rounded-full text-xs font-medium">Silver</span>
+              </div>
+              <div className="text-gray-600 text-xs leading-relaxed">
                 Last Order | Item | Date<br />
                 #0910 | Vitamin C + Zinc | 30 days ago<br />
                 #0988 | Zinc Plus | 30 days ago
               </div>
+
+              {/* Admin Note */}
               <div className="mt-4 p-3 bg-pink-50 border border-pink-200 rounded-lg text-pink-700 text-sm">
                 Admin Note: Customer asked about Collagen.
               </div>
@@ -80,41 +90,62 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Right: Receipt Tool */}
+        {/* Right Column - Receipt Verification Tool */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-6 py-4 font-bold text-lg">
-            Receipt Verification Tool
+          {/* Header */}
+          <div className="bg-orange-500 text-white px-6 py-4">
+            <h3 className="text-xl font-bold text-center">Receipt Verification Tool</h3>
           </div>
 
-          <div className="p-6 space-y-6">
+          <div className="p-8 space-y-8">
+            {/* User & Amount */}
             <div className="text-center">
               <p className="text-gray-700 font-medium">User: Jane Doe</p>
-              <p className="text-3xl font-bold text-green-600 mt-3">Detected: 1,500 THB</p>
-              <input type="text" value="1,500 THB" readOnly className="mt-3 w-full text-center border border-gray-300 rounded-lg py-3 bg-gray-50" />
-              <input type="text" placeholder="Receipt # T-99281" readOnly className="mt-3 w-full text-center border border-gray-300 rounded-lg py-3 bg-gray-50" />
-
-              <div className="mt-8 relative">
-                <div className="bg-gray-200 border-2 border-dashed rounded-xl w-full h-64 flex items-center justify-center cursor-zoom-in hover:bg-gray-250 transition">
-                  <ZoomIn className="w-16 h-16 text-gray-400" />
-                </div>
-                <p className="text-sm text-gray-500 text-center mt-3">[ RECEIPT IMAGE ] (Zoomable)</p>
-              </div>
-
-              <div className="flex items-center justify-center space-x-2 mt-6 text-green-600 font-medium">
-                <CheckCircle className="w-6 h-6" />
-                <span>No Duplicate Found</span>
-              </div>
+              <p className="text-4xl font-bold text-green-600 mt-3">Detected: 1,500 THB</p>
             </div>
 
+            {/* Input Fields */}
             <div className="space-y-4">
-              <button className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-5 rounded-xl text-lg shadow-lg transition transform hover:scale-105">
+              <input
+                type="text"
+                value="1,500 THB"
+                readOnly
+                className="w-full text-center text-lg font-medium border border-gray-300 rounded-full py-4 bg-gray-50 focus:outline-none"
+              />
+              <input
+                type="text"
+                value="Receipt # T-99281"
+                readOnly
+                className="w-full text-center text-gray-600 border border-gray-300 rounded-full py-4 bg-gray-50 focus:outline-none"
+              />
+            </div>
+
+            {/* Receipt Image Placeholder */}
+            <div className="relative">
+              <div className="bg-gray-100 border-2 border-dashed border-gray-300 rounded-2xl w-full h-80 flex items-center justify-center">
+                <Search className="w-20 h-20 text-gray-400" />
+              </div>
+              <p className="text-center text-sm text-gray-500 mt-3">[ RECEIPT IMAGE ] (Zoomable)</p>
+            </div>
+
+            {/* Duplicate Check */}
+            <div className="flex items-center justify-center space-x-2 text-green-600 font-medium">
+              <CheckCircle className="w-6 h-6" />
+              <span>No Duplicate Found</span>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="space-y-4">
+              <button className="w-full bg-green-600 hover:bg-green-700 text-white font-bold text-xl py-5 rounded-full shadow-lg transition transform hover:scale-105">
                 APPROVE (+1500 pts)
               </button>
-              <button className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-5 rounded-xl text-lg shadow-lg transition flex items-center justify-center gap-3">
-                <XCircle className="w-6 h-6" />
+
+              <button className="w-full bg-red-600 hover:bg-red-700 text-white font-bold text-xl py-5 rounded-full shadow-lg transition flex items-center justify-center gap-3">
+                <XCircle className="w-7 h-7" />
                 REJECT
               </button>
-              <select className="w-full border border-gray-300 rounded-lg px-4 py-4 text-gray-700">
+
+              <select className="w-full border border-gray-300 rounded-full px-6 py-4 text-gray-700 text-base focus:outline-none focus:ring-2 focus:ring-gray-300">
                 <option>Reason (Select...)</option>
                 <option>Blurred Image</option>
                 <option>Duplicate Receipt</option>
