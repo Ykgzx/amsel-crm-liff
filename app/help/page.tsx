@@ -46,7 +46,7 @@ export default function HelpPage() {
       name: "โทรหาเรา",
       icon: <Phone className="w-7 h-7" />,
       color: "bg-blue-500",
-      desc: "ทุกวัน 09:00 - 18:00 น.",
+      desc: "ทุกวัน 08:30 - 16:30 น.",
       action: "โทร 02-123-4567",
     },
     {
@@ -69,18 +69,6 @@ export default function HelpPage() {
           <div className="text-center mb-8">
             <div className="bg-orange-500 rounded-full px-6 py-2 w-fit mx-auto mb-4">
               <h1 className="text-xl font-bold text-white">ช่วยเหลือ</h1>
-            </div>
-
-            {/* พอยต์ของคุณ (เหมือนทุกหน้า) */}
-            <div className="inline-flex items-center gap-3 bg-orange-50 border-2 border-orange-200 rounded-2xl px-8 py-4">
-              <Gift className="w-8 h-8 text-orange-600" />
-              <div>
-                <p className="text-gray-600 text-sm">พอยต์ของคุณ</p>
-                <p className="text-3xl font-bold text-orange-600">
-                  {currentPoints.toLocaleString()} <span className="text-lg">Pts</span>
-                </p>
-              </div>
-              <Star className="w-8 h-8 text-orange-500 fill-orange-500" />
             </div>
           </div>
 
@@ -131,7 +119,7 @@ export default function HelpPage() {
           {/* ข้อความท้ายหน้า */}
           <div className="mt-10 text-center bg-orange-50 rounded-2xl p-6 border-2 border-orange-200">
             <p className="text-gray-700 font-medium">
-              ทีมงานพร้อมดูแลคุณทุกวัน ตั้งแต่ 09:00 - 18:00 น.
+              ทีมงานพร้อมดูแลคุณทุกวัน ตั้งแต่ 08:30 - 16:30 น.
             </p>
             <p className="text-orange-600 font-bold mt-2 text-lg">
               ยิ้มได้เสมอเมื่อมีเรา ♡
