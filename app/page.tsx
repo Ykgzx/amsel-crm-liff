@@ -1,13 +1,12 @@
-// app/page.tsx — เวอร์ชันสมบูรณ์ที่สุด (พร้อมทุกหน้าจริง)
-
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import liff from '@line/liff';
 import Link from 'next/link';
 import Navbar from './components/Navbar';
 import MemberCardCarousel from './components/MemberCardCarousel';
 
+// --- Interfaces ---
 interface LiffProfile {
   userId: string;
   displayName: string;
@@ -26,7 +25,10 @@ interface UserFullProfile {
   birthDate?: string | null;
 }
 
+// --- Constants ---
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.amsel-crm.com';
+const CACHE_KEY = 'amsel_home_cache_v4';
+const CACHE_LIFETIME = 5 * 60 * 1000; // 5 นาที
 
 export default function Home() {
   const carouselRef = useRef<HTMLDivElement>(null);
@@ -42,32 +44,38 @@ export default function Home() {
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // ป้องกัน Hydration Error #185 (สำคัญที่สุด)
+  // ป้องกัน Hydration Error #185 และจัดการการเลื่อนไปด้านบนสุดเมื่อเข้าหน้า
   const [hasMounted, setHasMounted] = useState(false);
-  useEffect(() => setHasMounted(true), []);
+  useEffect(() => {
+    setHasMounted(true);
+    // 🐛 FIX: บังคับ Scroll ไปด้านบนเมื่อเข้าหน้า (แก้ปัญหา In-App Browser จำตำแหน่ง Scroll)
+    window.scrollTo(0, 0);
+  }, []);
+
+  // --- Cache Functions ---
+  const saveToCache = useCallback((l: LiffProfile, u: UserFullProfile) => {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
+      liffProfile: l,
+      userProfile: u,
+      cachedAt: Date.now(),
+    }));
+  }, []);
 
   // โหลดจาก Cache ก่อน
   useEffect(() => {
-    const cached = localStorage.getItem('amsel_home_cache_v4');
+    const cached = localStorage.getItem(CACHE_KEY);
     if (cached) {
       try {
         const { liffProfile: l, userProfile: u } = JSON.parse(cached);
         setLiffProfile(l);
         setUserProfile(u);
         setIsLiffReady(true);
-      } catch {}
+      } catch { /* Ignore corrupted cache */ }
     }
   }, []);
 
-  const saveToCache = (l: LiffProfile, u: UserFullProfile) => {
-    localStorage.setItem('amsel_home_cache_v4', JSON.stringify({
-      liffProfile: l,
-      userProfile: u,
-      cachedAt: Date.now(),
-    }));
-  };
-
-  const fetchUserFullProfile = async (lineUserId: string) => {
+  // --- API Fetching ---
+  const fetchUserFullProfile = useCallback(async (lineUserId: string, liffProf: LiffProfile) => {
     await liff.ready;
     const token = liff.getAccessToken();
     if (!token) return;
@@ -79,7 +87,7 @@ export default function Home() {
           'X-Line-UserId': lineUserId,
         },
       });
-      if (!res.ok) return;
+      if (!res.ok) throw new Error('Failed to fetch user profile');
 
       const data = await res.json();
       const profile: UserFullProfile = {
@@ -94,13 +102,13 @@ export default function Home() {
         birthDate: data.birthDate,
       };
       setUserProfile(profile);
-      if (liffProfile) saveToCache(liffProfile, profile);
+      saveToCache(liffProf, profile);
     } catch (err) {
       console.error('Fetch profile failed:', err);
     }
-  };
+  }, [saveToCache]);
 
-  // LIFF Init
+  // --- LIFF Init ---
   useEffect(() => {
     const init = async () => {
       try {
@@ -113,33 +121,36 @@ export default function Home() {
         const profile = await liff.getProfile();
         setLiffProfile(profile);
         setIsLiffReady(true);
-        fetchUserFullProfile(profile.userId);
+        fetchUserFullProfile(profile.userId, profile);
       } catch {
         setLiffError('กรุณาเปิดผ่านแอป LINE เท่านั้น');
         setIsLiffReady(true);
       }
     };
     init();
-  }, []);
+  }, [fetchUserFullProfile]);
 
-  // Auto refresh เมื่อกลับมา
+  // --- Auto Refresh when visible ---
   useEffect(() => {
     const handler = () => {
       if (document.visibilityState === 'visible' && liffProfile) {
-        const cached = localStorage.getItem('amsel_home_cache_v4');
-        if (cached && Date.now() - JSON.parse(cached).cachedAt > 5 * 60 * 1000) {
-          fetchUserFullProfile(liffProfile.userId);
-        }
+        const cached = localStorage.getItem(CACHE_KEY);
+        try {
+          if (cached && Date.now() - JSON.parse(cached).cachedAt > CACHE_LIFETIME) {
+            fetchUserFullProfile(liffProfile.userId, liffProfile);
+          }
+        } catch { /* Ignore corrupted cache */ }
       }
     };
     document.addEventListener('visibilitychange', handler);
     return () => document.removeEventListener('visibilitychange', handler);
-  }, [liffProfile]);
+  }, [liffProfile, fetchUserFullProfile]);
 
+  // --- Handlers ---
   const handleRefresh = async () => {
     if (!liffProfile || isRefreshing) return;
     setIsRefreshing(true);
-    await fetchUserFullProfile(liffProfile.userId);
+    await fetchUserFullProfile(liffProfile.userId, liffProfile);
     setIsRefreshing(false);
   };
 
@@ -147,28 +158,31 @@ export default function Home() {
     setShowDetails(prev => ({ ...prev, [tier]: !prev[tier] }));
   };
 
-  // ป้องกัน Hydration Mismatch ด้วย hasMounted
-  const displayName = hasMounted
-    ? (userProfile?.title
-        ? `${userProfile.title} ${userProfile.firstName} ${userProfile.lastName}`
-        : `${userProfile?.firstName || ''} ${userProfile?.lastName || ''}`.trim() || liffProfile?.displayName || 'สมาชิก')
-    : 'สมาชิก';
-
   const goToNextPage = () => {
     if (currentPage < 2 && carouselRef.current) {
       setCurrentPage(p => p + 1);
-      carouselRef.current.scrollBy({ left: 440, behavior: 'smooth' });
+      // ใช้ scrollLeft แทน scrollBy เพื่อควบคุมตำแหน่งได้แม่นยำกว่าในบางกรณี
+      carouselRef.current.scrollLeft += 440;
     }
   };
 
   const goToPrevPage = () => {
     if (currentPage > 0 && carouselRef.current) {
       setCurrentPage(p => p - 1);
-      carouselRef.current.scrollBy({ left: -440, behavior: 'smooth' });
+      carouselRef.current.scrollLeft -= 440;
     }
   };
 
-  // Loading
+  // สร้างชื่อสำหรับแสดงผล
+  const displayName = hasMounted
+    ? (userProfile?.title
+      ? `${userProfile.title} ${userProfile.firstName} ${userProfile.lastName}`
+      : `${userProfile?.firstName || ''} ${userProfile?.lastName || ''}`.trim() || liffProfile?.displayName || 'สมาชิก')
+    : 'สมาชิก';
+
+  // --- Render Logic ---
+
+  // Loading State
   if (!isLiffReady || !hasMounted) {
     return (
       <>
@@ -178,8 +192,9 @@ export default function Home() {
             <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-full px-8 py-4 w-fit mx-auto shadow-2xl mb-8">
               <h2 className="text-2xl font-bold text-white">Member Card</h2>
             </div>
+            {/* Skeleton Loading remains the same for good UX */}
             <div className="flex space-x-4 overflow-x-auto pb-8">
-              {[1,2,3].map(i => (
+              {[1, 2, 3].map(i => (
                 <div key={i} className="flex-shrink-0 w-[calc(100%-2rem)] snap-start rounded-2xl p-6 bg-gray-100 border border-gray-200 shadow-lg animate-pulse">
                   <div className="h-16 bg-gray-300 rounded-2xl mb-6" />
                   <div className="h-8 bg-gray-300 rounded w-48 mx-auto mb-4" />
@@ -193,6 +208,7 @@ export default function Home() {
     );
   }
 
+  // LIFF Error State
   if (liffError) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center p-6 text-center">
@@ -206,6 +222,7 @@ export default function Home() {
     );
   }
 
+  // Main Content
   return (
     <>
       <Navbar />
@@ -230,16 +247,16 @@ export default function Home() {
             isRefreshing={isRefreshing}
           />
 
-          {/* ใช้ลิงก์จริงตามที่คุณบอกมา 100% */}
+          {/* Menu Links */}
           <div className="grid grid-cols-2 gap-6 mb-12">
             {[
-              { icon: 'fa-ticket-alt',      label: 'คูปองของฉัน',      href: '/coupons' },
-              { icon: 'fa-clipboard-list',  label: 'ประวัติการสั่งซื้อ', href: '/history' },
-              { icon: 'fa-map-marker-alt',  label: 'ที่อยู่',            href: '/addresses' },
-              { icon: 'fa-comment-dots',    label: 'รีวิว',             href: '/reviews' },
-              { icon: 'fa-receipt',         label: 'อัปโหลดใบเสร็จ',    href: '/receiptupload' },
-              { icon: 'fa-question-circle', label: 'ช่วยเหลือ',         href: '/help' },
-              { icon: 'fa-gift',            label: 'แลกของรางวัล',      href: '/rewardstore' },
+              { icon: 'fa-ticket-alt', label: 'คูปองของฉัน', href: '/coupons' },
+              { icon: 'fa-clipboard-list', label: 'ประวัติการสั่งซื้อ', href: '/history' },
+              { icon: 'fa-map-marker-alt', label: 'ที่อยู่', href: '/addresses' },
+              { icon: 'fa-comment-dots', label: 'รีวิว', href: '/reviews' },
+              { icon: 'fa-receipt', label: 'อัปโหลดใบเสร็จ', href: '/receiptupload' },
+              { icon: 'fa-question-circle', label: 'ช่วยเหลือ', href: '/help' },
+              { icon: 'fa-gift', label: 'แลกของรางวัล', href: '/rewardstore' },
             ].map(item => (
               <Link key={item.href} href={item.href} className="group">
                 <div className="flex flex-col items-center p-6 bg-white rounded-3xl shadow-lg hover:shadow-2xl hover:scale-105 transition-all duration-300 border-2 border-orange-100 hover:border-orange-400">
@@ -252,7 +269,7 @@ export default function Home() {
             ))}
           </div>
 
-          {/* สินค้าแนะนำ */}
+          {/* Recommended Products Carousel */}
           <h3 className="text-2xl font-bold mb-6 text-center">สินค้าแนะนำสำหรับคุณ</h3>
           <div className="relative">
             <button onClick={goToPrevPage} disabled={currentPage === 0}
@@ -271,6 +288,7 @@ export default function Home() {
               ].map((p, i) => (
                 <div key={i} className="flex-shrink-0 w-48 snap-start bg-white rounded-3xl border-4 border-orange-100 shadow-2xl overflow-hidden hover:scale-105 transition-all duration-300">
                   <div className="h-40 bg-gradient-to-br from-orange-50 to-amber-50 flex items-center justify-center">
+                    {/*  - (Example of where an image tag might go, but not strictly necessary here) */}
                     <img src={p.img} alt={p.name} className="w-32 h-32 object-contain" />
                   </div>
                   <div className="p-5 text-center">
