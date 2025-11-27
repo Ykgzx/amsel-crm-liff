@@ -1,4 +1,4 @@
-// app/admin/layout.tsx
+// app/admin/layout.tsx   ← ใช้ไฟล์นี้แทนของเดิมทั้งหมด
 'use client';
 
 import AdminSidebar from '../components/AdminSidebar';
@@ -10,58 +10,60 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
     <>
       <div className="min-h-screen bg-gray-50 flex">
         {/* Desktop Sidebar */}
-        <div className="hidden lg:flex lg:w-64 lg:flex-col">
+        <div className="hidden lg:flex lg:w-64 lg:flex-shrink-0">
           <AdminSidebar />
         </div>
 
-        {/* Mobile Sidebar - Drawer */}
+        {/* Mobile Sidebar (Drawer) */}
         <div
-          className={`fixed inset-0 z-40 lg:hidden ${sidebarOpen ? 'block' : 'hidden'}`}
-          onClick={() => setSidebarOpen(false)}
-        >
-          <div className="fixed inset-0 bg-black opacity-50" />
-        </div>
-
-        <div
-          className={`fixed top-0 left-0 z-50 h-full w-64 bg-gray-900 transform transition-transform duration-300 lg:hidden ${
-            sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          className={`fixed inset-0 z-40 lg:hidden transition-opacity ${
+            mobileMenuOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
           }`}
+          onClick={() => setMobileMenuOpen(false)}
         >
-          <div className="flex justify-between items-center p-6 border-b border-gray-800">
-            <h1 className="text-2xl font-bold text-white">AMSEL ADMIN</h1>
-            <button
-              onClick={() => setSidebarOpen(false)}
-              className="text-white hover:bg-gray-800 p-2 rounded-lg"
-            >
-              <X className="w-6 h-6" />
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            <AdminSidebar /> {/* ใช้ Sidebar เดียวกันได้เลย */}
+          <div className="absolute inset-0 bg-black/50" />
+          <div
+            className={`absolute left-0 top-0 h-full w-64 bg-gray-900 transform transition-transform ${
+              mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-6 border-b border-gray-800">
+              <h1 className="text-2xl font-bold text-white">AMSEL ADMIN</h1>
+              <button
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-white hover:bg-gray-800 p-2 rounded-lg transition"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto py-4">
+              <AdminSidebar />
+            </div>
           </div>
         </div>
 
-        {/* Main Content + Mobile Header */}
+        {/* Main Content */}
         <div className="flex-1 flex flex-col w-full">
-          {/* Mobile Top Bar */}
-          <header className="lg:hidden bg-white border-b border-gray-200 px-4 py-4 flex items-center justify-between">
+          {/* Mobile Header – โผล่มาแค่ในมือถือ/แท็บเล็ต */}
+          <header className="lg:hidden bg-gray-900 text-white px-6 py-4 flex items-center justify-between shadow-lg">
             <button
-              onClick={() => setSidebarOpen(true)}
-              className="p-2 rounded-lg hover:bg-gray-100"
+              onClick={() => setMobileMenuOpen(true)}
+              className="p-2 hover:bg-gray-800 rounded-lg transition"
             >
-              <Menu className="w-6 h-6 text-gray-700" />
+              <Menu className="w-6 h-6" />
             </button>
-            <h1 className="text-xl font-bold text-gray-800">AMSEL ADMIN</h1>
-            <div className="w-10" /> {/* ตัวเว้นว่างขวาสุดให้สมดุลกับปุ่มเมนู */}
+            <h1 className="text-xl font-bold">AMSEL ADMIN</h1>
+            <div className="w-10" /> {/* spacer */}
           </header>
 
-          {/* Page Content */}
+          {/* เนื้อหาหน้า */}
           <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
             {children}
           </main>
