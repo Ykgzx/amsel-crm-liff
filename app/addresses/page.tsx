@@ -77,19 +77,6 @@ export default function AddressesPage() {
             <div className="bg-orange-500 rounded-full px-6 py-2 w-fit mx-auto mb-4">
               <h1 className="text-xl font-bold text-white">ร้านค้าใกล้ฉัน</h1>
             </div>
-
-            <div className="inline-flex items-center gap-3 bg-orange-50 border-2 border-orange-200 rounded-2xl px-8 py-4">
-              <MapPin className="w-8 h-8 text-orange-600" />
-              <div>
-                <p className="text-gray-600 text-sm">พอยต์ของคุณ</p>
-                <p className="text-3xl font-bold text-orange-600">
-                  {currentPoints.toLocaleString()} <span className="text-lg">Pts</span>
-                </p>
-              </div>
-              <svg className="w-8 h-8 text-orange-500" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-              </svg>
-            </div>
           </div>
 
           {/* แผนที่ */}
