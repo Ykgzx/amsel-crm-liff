@@ -47,6 +47,7 @@ export default function StoreMap({ userLocation, stores }: StoreMapProps) {
 
   return (
     <MapContainer
+      data-testid="map-container"
       center={mapCenter}
       zoom={zoom}
       scrollWheelZoom={false}
@@ -57,6 +58,7 @@ export default function StoreMap({ userLocation, stores }: StoreMapProps) {
         border: '2px solid #fed7aa',
         zIndex: 0,
       }}
+      {...({} as any)}
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'

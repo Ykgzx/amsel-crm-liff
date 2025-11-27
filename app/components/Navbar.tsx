@@ -33,7 +33,7 @@ export default function Navbar() {
   }, []);
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 h-20 bg-gradient-to-r from-amber-500 via-white to-orange-500 flex items-center justify-center px-6 md:px-14 shadow-lg">
+    <div role="navigation" className="fixed top-0 left-0 right-0 z-50 h-20 bg-gradient-to-r from-amber-500 via-white to-orange-500 flex items-center justify-center px-6 md:px-14 shadow-lg">
       
       {/* Logo AMSel */}
       <Link href="/" className="flex items-center">
@@ -49,7 +49,9 @@ export default function Navbar() {
 
       {/* Profile Picture - จัดให้อยู่กึ่งกลางแนวตั้งอย่างสมบูรณ์ */}
       <Link href="/editprofile">
-        <div className="
+        <div 
+        data-testid="profile-avatar"
+        className="
           absolute right-5 md:right-12 
           w-12 h-12 
           rounded-full overflow-hidden 
