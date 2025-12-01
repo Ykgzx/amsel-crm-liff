@@ -101,11 +101,11 @@ export default function Home() {
             Authorization: `Bearer ${token}`,
           },
         });
-
+        
         if (!res.ok) throw new Error('Failed to fetch profile');
 
         const data = await res.json();
-
+        console.log(data);
         // สำคัญ: แปลง role ให้เป็น lowercase แล้วเช็ค
         const normalizedRole = (data.role || 'USER').toString().toLowerCase();
         const isAdmin = normalizedRole === 'admin';
