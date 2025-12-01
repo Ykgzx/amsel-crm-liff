@@ -78,6 +78,8 @@ export default function Home() {
   const fetchUserFullProfile = useCallback(async (lineUserId: string, liffProf: LiffProfile) => {
     await liff.ready;
     const token = liff.getAccessToken();
+    console.log(token);
+    console.log(liff.getIDToken());
     if (!token) return;
 
     try {
