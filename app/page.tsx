@@ -103,7 +103,6 @@ export default function Home() {
         const res = await fetch(`${BACKEND_URL}/api/users/profile`, {
           headers: {
             Authorization: `Bearer ${token}`,
-            'X-Line-UserId': lineUserId,
           },
         });
 
