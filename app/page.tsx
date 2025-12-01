@@ -24,12 +24,12 @@ interface UserFullProfile {
   email?: string | null;
   phoneNumber?: string | null;
   birthDate?: string | null;
-  role?: 'user' | 'admin'; // เพิ่ม role
+  role: 'user' | 'admin'; // เราจะแปลงให้เป็น lowercase เสมอ
 }
 
 // --- Constants ---
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.amsel-crm.com';
-const CACHE_KEY = 'amsel_home_cache_v5'; // เปลี่ยน version เพราะเพิ่ม role
+const CACHE_KEY = 'amsel_home_cache_v6'; // เปลี่ยน version เพราะแก้ logic role
 const CACHE_LIFETIME = 5 * 60 * 1000; // 5 นาที
 
 export default function Home() {
@@ -50,13 +50,13 @@ export default function Home() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
 
-  // ป้องกัน Hydration Error + Scroll to top
+  // ป้องกัน Hydration + Scroll to top
   useEffect(() => {
     setHasMounted(true);
     window.scrollTo(0, 0);
   }, []);
 
-  // --- Cache Functions ---
+  // --- Cache ---
   const saveToCache = useCallback((l: LiffProfile, u: UserFullProfile) => {
     localStorage.setItem(
       CACHE_KEY,
@@ -68,25 +68,21 @@ export default function Home() {
     );
   }, []);
 
-  // โหลดจาก Cache ก่อน (ถ้ายังไม่มี role ให้ดึงใหม่)
+  // โหลดจาก Cache (ถ้าเป็น admin จาก cache → redirect ทันที)
   useEffect(() => {
     const cached = localStorage.getItem(CACHE_KEY);
     if (cached) {
       try {
-        const parsed = JSON.parse(cached);
-        const { liffProfile: l, userProfile: u } = parsed;
-
+        const { liffProfile: l, userProfile: u } = JSON.parse(cached);
         setLiffProfile(l);
         setUserProfile(u);
         setIsLiffReady(true);
 
-        // ถ้าเป็น admin จาก cache → redirect ทันที
-        if (u?.role === 'admin') {
+        if (u.role === 'admin') {
           router.replace('/admin');
-          return;
         }
       } catch {
-        // corrupted cache → ignore
+        localStorage.removeItem(CACHE_KEY);
       }
     }
   }, [router]);
@@ -110,6 +106,10 @@ export default function Home() {
 
         const data = await res.json();
 
+        // สำคัญ: แปลง role ให้เป็น lowercase แล้วเช็ค
+        const normalizedRole = (data.role || 'USER').toString().toLowerCase();
+        const isAdmin = normalizedRole === 'admin';
+
         const profile: UserFullProfile = {
           points: data.points || 0,
           accumulatedPoints: data.accumulatedPoints || 0,
@@ -120,13 +120,12 @@ export default function Home() {
           email: data.email,
           phoneNumber: data.phoneNumber,
           birthDate: data.birthDate,
-          role: data.role, // สำคัญ: ต้องมี field role จาก backend
+          role: isAdmin ? 'admin' : 'user', // ส่งออกเป็น lowercase เสมอ
         };
 
-        // ตรวจสอบ role แล้ว redirect
-        if (profile.role === 'admin') {
-          // เคลียร์ cache เก่าก่อน redirect (ป้องกัน loop)
-          localStorage.removeItem(CACHE_KEY);
+        // ถ้าเป็น admin → redirect ไปหน้า admin ทันที
+        if (isAdmin) {
+          localStorage.removeItem(CACHE_KEY); // ล้าง cache เก่า
           router.replace('/admin');
           return;
         }
@@ -156,10 +155,9 @@ export default function Home() {
         setLiffProfile(profile);
         setIsLiffReady(true);
 
-        // ดึงข้อมูลพร้อมตรวจ role
         await fetchUserFullProfile(profile.userId, profile);
       } catch (err) {
-        console.error(err);
+        console.error('LIFF init error:', err);
         setLiffError('กรุณาเปิดผ่านแอป LINE เท่านั้น');
         setIsLiffReady(true);
       }
@@ -168,7 +166,7 @@ export default function Home() {
     init();
   }, [fetchUserFullProfile]);
 
-  // Auto refresh when tab visible
+  // Auto refresh
   useEffect(() => {
     const handler = () => {
       if (document.visibilityState === 'visible' && liffProfile && userProfile?.role !== 'admin') {
@@ -187,7 +185,7 @@ export default function Home() {
     return () => document.removeEventListener('visibilitychange', handler);
   }, [liffProfile, userProfile, fetchUserFullProfile]);
 
-  // --- Handlers ---
+  // Handlers
   const handleRefresh = async () => {
     if (!liffProfile || isRefreshing) return;
     setIsRefreshing(true);
@@ -219,12 +217,7 @@ export default function Home() {
       : `${userProfile?.firstName || ''} ${userProfile?.lastName || ''}`.trim() || liffProfile?.displayName || 'สมาชิก'
     : 'สมาชิก';
 
-  // ถ้าเป็น admin แล้วยังไม่ redirect (กรณี cache เก่า) → บังคับ redirect
-  if (userProfile?.role === 'admin') {
-    return null; // หรือใส่ Loading spinner ก็ได้
-  }
-
-  // Loading State
+  // ถ้ายังโหลดอยู่
   if (!isLiffReady || !hasMounted) {
     return (
       <>
@@ -236,10 +229,7 @@ export default function Home() {
             </div>
             <div className="flex space-x-4 overflow-x-auto pb-8">
               {[1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="flex-shrink-0 w-[calc(100%-2rem)] snap-start rounded-2xl p-6 bg-gray-100 border border-gray-200 shadow-lg animate-pulse"
-                >
+                <div key={i} className="flex-shrink-0 w-[calc(100%-2rem)] snap-start rounded-2xl p-6 bg-gray-100 border border-gray-200 shadow-lg animate-pulse">
                   <div className="h-16 bg-gray-300 rounded-2xl mb-6" />
                   <div className="h-8 bg-gray-300 rounded w-48 mx-auto mb-4" />
                   <div className="h-32 bg-gray-200 rounded-xl" />
@@ -252,16 +242,12 @@ export default function Home() {
     );
   }
 
-  // LIFF Error
   if (liffError) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center p-6 text-center">
         <div>
           <p className="text-red-500 text-lg mb-6">{liffError}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-10 py-4 bg-orange-500 text-white rounded-full font-bold text-lg"
-          >
+          <button onClick={() => window.location.reload()} className="px-10 py-4 bg-orange-500 text-white rounded-full font-bold text-lg">
             ลองใหม่
           </button>
         </div>
@@ -269,7 +255,12 @@ export default function Home() {
     );
   }
 
-  // Main Content (เฉพาะ user ปกติ)
+  // สำคัญ: ถ้าเป็น admin แล้วยังไม่ redirect (กรณี cache เก่า)
+  if (userProfile?.role === 'admin') {
+    return null; // หรือใส่ Loading ก็ได้
+  }
+
+  // หน้า Home ปกติ (เฉพาะ user)
   return (
     <>
       <Navbar />
@@ -309,9 +300,7 @@ export default function Home() {
                   <div className="w-20 h-20 bg-gradient-to-br from-orange-100 to-orange-200 rounded-full flex items-center justify-center mb-3 group-hover:from-orange-200 group-hover:to-orange-300">
                     <i className={`fas ${item.icon} text-3xl text-orange-600`} />
                   </div>
-                  <span className="text-sm font-medium text-gray-700 group-hover:text-orange-600">
-                    {item.label}
-                  </span>
+                  <span className="text-sm font-medium text-gray-700 group-hover:text-orange-600">{item.label}</span>
                 </div>
               </Link>
             ))}
@@ -320,20 +309,11 @@ export default function Home() {
           {/* Recommended Products */}
           <h3 className="text-2xl font-bold mb-6 text-center">สินค้าแนะนำสำหรับคุณ</h3>
           <div className="relative">
-            <button
-              onClick={goToPrevPage}
-              disabled={currentPage === 0}
-              className={`absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-4 shadow-2xl border-4 border-orange-200 transition-all ${
-                currentPage === 0 ? 'opacity-50' : 'hover:border-orange-500 hover:scale-110'
-              }`}
-            >
+            <button onClick={goToPrevPage} disabled={currentPage === 0} className={`absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-4 shadow-2xl border-4 border-orange-200 transition-all ${currentPage === 0 ? 'opacity-50' : 'hover:border-orange-500 hover:scale-110'}`}>
               <i className="fas fa-chevron-left text-orange-600 text-2xl" />
             </button>
 
-            <div
-              ref={carouselRef}
-              className="flex space-x-6 overflow-x-auto pb-8 px-16 scrollbar-hide snap-x snap-mandatory"
-            >
+            <div ref={carouselRef} className="flex space-x-6 overflow-x-auto pb-8 px-16 scrollbar-hide snap-x snap-mandatory">
               {[
                 { name: 'แอมเซลกลูต้า พลัส', img: '/gluta.png' },
                 { name: 'แอมเซลซิงค์พลัส', img: '/zinc.png' },
@@ -342,10 +322,7 @@ export default function Home() {
                 { name: 'แคลเซียม แอลทรีโอเนต', img: '/Calcium.png' },
                 { name: 'อะมิโนบิลเบอร์รี่', img: '/amsel-amino-bilberry.png' },
               ].map((p, i) => (
-                <div
-                  key={i}
-                  className="flex-shrink-0 w-48 snap-start bg-white rounded-3xl border-4 border-orange-100 shadow-2xl overflow-hidden hover:scale-105 transition-all duration-300"
-                >
+                <div key={i} className="flex-shrink-0 w-48 snap-start bg-white rounded-3xl border-4 border-orange-100 shadow-2xl overflow-hidden hover:scale-105 transition-all duration-300">
                   <div className="h-40 bg-gradient-to-br from-orange-50 to-amber-50 flex items-center justify-center">
                     <img src={p.img} alt={p.name} className="w-32 h-32 object-contain" />
                   </div>
@@ -359,13 +336,7 @@ export default function Home() {
               ))}
             </div>
 
-            <button
-              onClick={goToNextPage}
-              disabled={currentPage >= 2}
-              className={`absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-4 shadow-2xl border-4 border-orange-200 transition-all ${
-                currentPage >= 2 ? 'opacity-50' : 'hover:border-orange-500 hover:scale-110'
-              }`}
-            >
+            <button onClick={goToNextPage} disabled={currentPage >= 2} className={`absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-4 shadow-2xl border-4 border-orange-200 transition-all ${currentPage >= 2 ? 'opacity-50' : 'hover:border-orange-500 hover:scale-110'}`}>
               <i className="fas fa-chevron-right text-orange-600 text-2xl" />
             </button>
           </div>
